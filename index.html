@@ -5,88 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#071014">
 <title>NEHAN // ALPHA</title>
-<style>
-:root{
-  --bg:#06090c;--panel:#0b1217;--panel2:#0e181e;--line:#20343d;--text:#dfe9e9;--muted:#75858b;
-  --cyan:#72f6ff;--red:#ff5e6c;--amber:#e7ca74;--green:#70e1a1;--purple:#ba8cff;
-}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:
-radial-gradient(circle at 50% -20%,#102932 0,#071014 35%,#040608 75%);
-color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Noto Sans JP",monospace}
-body{min-height:100vh}
-button,input{font:inherit}
-button{color:inherit}
-#app{max-width:900px;margin:0 auto;min-height:100vh;padding:14px 14px 40px}
-.topline{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0 16px}
-.brand{font-weight:900;letter-spacing:.25em;color:var(--cyan);font-size:20px;text-shadow:0 0 16px rgba(114,246,255,.4)}
-.alpha{font-size:10px;color:var(--muted);border:1px solid var(--line);padding:4px 7px;letter-spacing:.16em}
-.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(14,24,30,.94),rgba(8,14,18,.96));box-shadow:0 18px 45px rgba(0,0,0,.25);padding:14px;margin-bottom:12px}
-.panel h2,.panel h3{margin:0 0 10px}
-.kicker{font-size:10px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase}
-.muted{color:var(--muted)}
-.small{font-size:12px}
-.grid{display:grid;gap:10px}
-.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
-.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
-.stat{border:1px solid var(--line);background:#081015;padding:8px;text-align:center}
-.stat b{display:block;font-size:18px;color:#fff}
-.btn{width:100%;border:1px solid #31505c;background:#0b171d;padding:12px;cursor:pointer;text-align:left;transition:.12s}
-.btn:hover:not(:disabled){border-color:var(--cyan);transform:translateY(-1px)}
-.btn:disabled{opacity:.36;cursor:not-allowed}
-.btn.primary{border-color:#42808c;background:#10272d;color:#ecfeff}
-.btn.danger{border-color:#67303a;background:#221013}
-.btn.ghost{background:transparent}
-.btn .title{font-weight:800}
-.btn .meta{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5}
-.menu .btn{text-transform:uppercase;letter-spacing:.12em}
-.slot{min-height:128px}
-.slot .name{font-size:17px;font-weight:800;margin:5px 0}
-.slot.empty{border-style:dashed}
-.hpbar{height:9px;background:#1b2326;border:1px solid #29383e;overflow:hidden;margin-top:5px}
-.hpbar>i{display:block;height:100%;background:linear-gradient(90deg,#b23e4b,#ff7b86)}
-.shield{color:var(--cyan)}
-.route{position:relative;padding:14px;border:1px solid var(--line);background:#0a1217;cursor:pointer;min-height:165px}
-.route:hover{border-color:var(--cyan)}
-.route .side{font-size:10px;color:var(--cyan);letter-spacing:.16em}
-.route .enemy{font-weight:800;font-size:18px;margin:8px 0}
-.future{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
-.future span{border:1px dashed #263a42;padding:7px;font-size:10px;color:#93a4a9}
-.intent{border:1px solid #62333a;background:#1a0d11;padding:10px;color:#ffc2c7}
-.combat-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
-.tag{display:inline-block;border:1px solid var(--line);padding:2px 5px;font-size:10px;margin-right:4px}
-.tag.std{color:var(--amber);border-color:#665a32}
-.tag.inst{color:var(--cyan);border-color:#2a5960}
-.tag.bad{color:var(--red);border-color:#63313a}
-.memory{position:relative}
-.memory.broken{border-color:#6e303a;background:#190b0e}
-.memrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.formula{font-size:10px;color:#8fb1b7;margin-top:5px;word-break:break-word}
-.log{height:150px;overflow:auto;background:#05090b;border:1px solid #18272d;padding:8px;font-size:11px;line-height:1.55}
-.log div{margin-bottom:3px}
-.log .good{color:var(--green)}
-.log .bad{color:#ff8b95}
-.log .sys{color:var(--cyan)}
-.screen-title{font-size:28px;letter-spacing:.08em;margin:4px 0 6px}
-.rule-note{border-left:2px solid var(--amber);padding-left:10px;color:#aebbbf;font-size:11px;line-height:1.6}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.74);display:flex;align-items:center;justify-content:center;padding:18px;z-index:5}
-.modal-card{max-width:560px;width:100%;border:1px solid #31505c;background:#081116;padding:18px;box-shadow:0 30px 90px #000}
-.hidden{display:none!important}
-input[type="text"]{width:100%;border:1px solid var(--line);background:#050a0d;color:#fff;padding:12px}
-.footer{font-size:10px;color:#526167;margin-top:24px;line-height:1.6}
-@media(max-width:650px){
-  #app{padding:10px 10px 30px}
-  .grid3{grid-template-columns:1fr}
-  .stats{grid-template-columns:repeat(4,1fr)}
-  .stat{padding:6px 3px}.stat b{font-size:16px}
-  .memrow{grid-template-columns:1fr}
-  .screen-title{font-size:22px}
-}
-</style>
+<link rel="stylesheet" href="style.css">
+<link rel="preload" as="image" href="assets/studio_logo.png">
+
 </head>
 <body>
 <div id="app"></div>
+<div id="splash" class="splash" role="button" tabindex="0" aria-label="スタジオロゴ・タップでスキップ">
+  <img src="assets/studio_logo.png" alt="STUDIO" width="1122" height="1402">
+  <span>TAP TO CONNECT</span>
+</div>
 <script>
 (() => {
 "use strict";
@@ -195,13 +123,14 @@ function makeRoutes(depth){
 }
 
 function top(){
-  return `<div class="topline"><div class="brand">NEHAN</div><div class="alpha">PLAYABLE ALPHA / 0.1</div></div>`;
+  return `<div class="topline"><div class="brand">NEHAN</div><div class="alpha">電脳涅槃 / ALPHA</div></div>`;
 }
 function footer(){
-  return `<div class="footer">NEHAN alpha prototype. 仕様未確定部分は最小限の仮実装としてコード内に隔離しています。保存先: browser localStorage.</div>`;
+  return `<div class="footer">NEHAN / 記憶は残る。肉体は残らない。</div>`;
 }
 
 function render(){
+  el.dataset.screen = state.screen === "run" ? (state.run?.phase || "map") : state.screen;
   if(state.screen==="home") return renderHome();
   if(state.screen==="play") return renderPlay();
   if(state.screen==="create") return renderCreate();
@@ -212,7 +141,7 @@ function render(){
 
 function renderHome(){
   el.innerHTML = top()+`
-  <section class="panel">
+  <section class="panel home-hero">
     <div class="kicker">CENTRAL DISTRICT / ACCESS TERMINAL</div>
     <div class="screen-title">涅槃へ接続する。</div>
     <p class="muted small">記憶は残る。肉体は残らない。</p>
@@ -289,7 +218,7 @@ function renderRun(){
 }
 
 function charHeader(c){
-  return `<section class="panel">
+  return `<section class="panel player-panel">
     <div class="combat-head">
       <div><div class="kicker">${esc(c.name)} / DEPTH ${state.run.depth}</div><h3 style="margin:3px 0">HP ${c.hp} / ${c.maxHp} ${state.run.shield?`<span class="shield">+ SHIELD ${state.run.shield}</span>`:""}</h3></div>
       <button class="btn ghost small" id="exitRun" style="width:auto;padding:7px">HOME</button>
@@ -304,19 +233,19 @@ function charHeader(c){
 function renderMap(c){
   const routes=state.run.routes;
   el.innerHTML=top()+charHeader(c)+`
-  <section class="panel">
+  <section class="panel map-panel">
     <div class="kicker">ROUTE FORECAST / 2 STEPS</div>
     <h2>進路を選択</h2>
     <p class="small muted">左右どちらかへ進む。各ルートのさらに先、2候補まで予告されます。</p>
     <div class="grid grid2">
       ${routes.map(r=>{
         const e=ENEMIES.find(x=>x.id===r.enemyId);
-        return `<div class="route" data-route="${r.side}">
+        return `<button class="route" data-route="${r.side}">
           <div class="side">${r.side==="L"?"LEFT":"RIGHT"} ROUTE</div>
           <div class="enemy">${esc(e.name)}</div>
           <div class="small muted">戦闘ノード / 深度補正 +${state.run.depth}</div>
           <div class="future"><span>NEXT // ${esc(r.future[0])}</span><span>NEXT // ${esc(r.future[1])}</span></div>
-        </div>`;
+        </button>`;
       }).join("")}
     </div>
   </section>`+footer();
@@ -352,28 +281,28 @@ function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
   const memories=c.memories.map((m,i)=>renderMemory(c,m,i)).join("");
   const weaponDamage=calcScaled(c.weapon.basePower,c.stats.STR);
-  const logs=combat.log.map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("");
+  const logs=combat.log.slice(-3).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("");
   el.innerHTML=top()+charHeader(c)+`
-  <section class="panel">
+  <section class="panel enemy-panel">
     <div class="kicker">HOSTILE ENTITY</div>
     <h2>${esc(e.name)}</h2>
     <div>HP ${e.hp} / ${e.maxHp} ${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}</div>
     <div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i></div>
     <div class="intent" style="margin-top:10px">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
   </section>
-  <section class="panel">
+  <section class="panel actions-panel">
     <div class="kicker">ACTIONS</div>
     <h3>武器</h3>
     <button class="btn primary" id="weaponBtn">
       <div><span class="tag std">標準実行</span><span class="title">${esc(c.weapon.name)}</span></div>
-      <div class="meta">敵に【${weaponDamage}】ダメージ / 命中率 ${c.weapon.hit}% / 使用後ターン終了</div>
+      <div class="meta">威力 ${weaponDamage} / 命中 ${c.weapon.hit}% / ターン終了</div>
       <div class="formula">9 × (1 + √STR × 0.12)</div>
     </button>
     <h3 style="margin-top:14px">MEMORY // 4 SLOTS</h3>
     <div class="memrow">${memories}</div>
   </section>
-  <section class="panel"><div class="kicker">COMBAT LOG</div><div class="log" id="logBox">${logs}</div></section>
-  <section class="rule-note">破損処理順: 現在の破損率で判定 → 使用後に破損率 +0.0〜0.5%。即時実行はターンを終了しません。</section>`+footer();
+  <section class="panel combat-log"><div class="kicker">COMBAT LOG</div><div class="log" id="logBox">${logs}</div></section>
+`+footer();
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
   document.querySelector("#weaponBtn").onclick=()=>useWeapon(c);
   document.querySelectorAll("[data-memory]").forEach(b=>b.onclick=()=>useMemory(c,+b.dataset.memory));
@@ -386,12 +315,12 @@ function renderMemory(c,m,i){
   const unavailable=m.currentCT>0 || m.broken;
   let effect = d.category==="回復" ? `HPを【${val}】回復` : d.category==="防御" ? `防壁【${val}】を得る` : `敵に【${val}】ダメージ`;
   return `<button class="btn memory ${m.broken?"broken":""}" data-memory="${i}" ${unavailable?"disabled":""}>
-    <div><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span>
+    <div><span class="tag ${m.broken?"bad":d.execution==="STANDARD"?"std":"inst"}">${m.broken?"BROKEN":d.execution==="STANDARD"?"標準実行":"即時実行"}</span>
       <span class="title">${esc(d.name)}</span>
     </div>
-    <div class="meta">${esc(d.category)} / ${esc(d.rarity)} / CT ${m.currentCT}/${d.ct}<br>${effect} / ${d.category==="攻撃"?`命中率 ${d.hit}%`:"命中判定なし"}<br>破損率 ${m.breakageRate.toFixed(2)}%</div>
+    <div class="meta">${effect}<br>${d.category==="攻撃"?`命中 ${d.hit}%`:"命中判定なし"}</div>
+    <div class="memory-status"><span>CT ${m.currentCT}/${d.ct}</span><span class="wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>
     <div class="formula">${esc(d.formula)}</div>
-    ${m.broken?`<div class="tag bad">BROKEN</div>`:""}
   </button>`;
 }
 
@@ -523,7 +452,7 @@ function renderInventory(){
   el.innerHTML=top()+`
   <section class="panel"><div class="kicker">INVENTORY</div><h2>MEMORY / MODULE</h2>
   <p class="small muted">α版では生存中キャラクターに装備されたメモリ状態のみ確認できます。</p></section>
-  ${owned.length?owned.map(c=>`<section class="panel"><h3>${esc(c.name)}</h3>${c.memories.map(m=>{const d=getMemDef(m);return `<div class="small" style="padding:7px 0;border-top:1px solid var(--line)">${esc(d.name)} / 破損率 ${m.breakageRate.toFixed(2)}% / ${m.broken?"BROKEN":"ACTIVE"}</div>`}).join("")}</section>`).join(""):`<section class="panel muted">保有データなし。</section>`}
+  ${owned.length?owned.map(c=>`<section class="panel inventory-panel"><h3>${esc(c.name)}</h3>${c.memories.map(m=>{const d=getMemDef(m);return `<div class="small" style="padding:7px 0;border-top:1px solid var(--line)">${esc(d.name)} / 破損率 ${m.breakageRate.toFixed(2)}% / ${m.broken?"BROKEN":"ACTIVE"}</div>`}).join("")}</section>`).join(""):`<section class="panel muted">保有データなし。</section>`}
   <button class="btn ghost" data-nav="home">← HOME</button>`+footer();
   bindNav();
 }
@@ -546,7 +475,27 @@ function bindNav(){
   document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{state.screen=b.dataset.nav;save();render();});
 }
 
+state.screen="home";
 render();
+const splash=document.querySelector("#splash");
+let splashTimer, closed=false;
+function closeSplash(){
+  if(closed) return;
+  closed=true;clearTimeout(splashTimer);
+  splash.classList.add("leaving");
+  el.inert=false;
+  setTimeout(()=>splash.remove(),450);
+}
+el.inert=true;
+splash.onclick=closeSplash;
+splash.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();closeSplash();}};
+splashTimer=setTimeout(closeSplash,2400);
+// Follow the visual viewport while the software keyboard is open, without scrolling.
+if(window.visualViewport){
+  const fitViewport=()=>{el.style.height=`${window.visualViewport.height}px`;};
+  window.visualViewport.addEventListener("resize",fitViewport);
+  fitViewport();
+}
 })();
 </script>
 </body>
