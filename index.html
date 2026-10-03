@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#071014">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=0.2">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 
 </head>
@@ -279,49 +279,61 @@ function chooseEnemyIntent(){
 
 function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
-  const memories=c.memories.map((m,i)=>renderMemory(c,m,i)).join("");
-  const weaponDamage=calcScaled(c.weapon.basePower,c.stats.STR);
-  const logs=combat.log.slice(-3).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("");
-  el.innerHTML=top()+charHeader(c)+`
-  <section class="panel enemy-panel">
-    <div class="kicker">HOSTILE ENTITY</div>
-    <h2>${esc(e.name)}</h2>
-    <div>HP ${e.hp} / ${e.maxHp} ${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}</div>
-    <div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i></div>
-    <div class="intent" style="margin-top:10px">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
+  const enemyArt={E01:"sentinel",E02:"hunter",E03:"monk"}[e.id]||"sentinel";
+  el.innerHTML=top()+`
+  <section class="battle-scene">
+    <div class="battle-heading"><span class="kicker">DEPTH ${state.run.depth} / BATTLE</span><button class="btn ghost small" id="exitRun">HOME</button></div>
+    <div class="enemy-figure"><div class="kicker">${esc(e.name)}</div><img src="assets/${enemyArt}.svg" alt="${esc(e.name)}"></div>
+    <div class="enemy-health"><b>HP ${e.hp} / ${e.maxHp}</b>${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}<div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i></div></div>
+    <div class="intent">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
+    <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
+    <div class="player-figure"><img src="assets/protagonist.svg" alt="${esc(c.name)}"><span class="kicker">${esc(c.name)}</span></div>
+    <div class="player-health"><b>HP ${c.hp} / ${c.maxHp}</b>${state.run.shield?`<span class="shield">SHIELD ${state.run.shield}</span>`:""}<div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div><div class="battle-stats">${Object.entries(c.stats).map(([k,v])=>`<span>${k} ${v}</span>`).join("")}</div></div>
   </section>
-  <section class="panel actions-panel">
-    <div class="kicker">ACTIONS</div>
-    <h3>武器</h3>
-    <button class="btn primary" id="weaponBtn">
-      <div><span class="tag std">標準実行</span><span class="title">${esc(c.weapon.name)}</span></div>
-      <div class="meta">威力 ${weaponDamage} / 命中 ${c.weapon.hit}% / ターン終了</div>
-      <div class="formula">9 × (1 + √STR × 0.12)</div>
-    </button>
-    <h3 style="margin-top:14px">MEMORY // 4 SLOTS</h3>
-    <div class="memrow">${memories}</div>
-  </section>
-  <section class="panel combat-log"><div class="kicker">COMBAT LOG</div><div class="log" id="logBox">${logs}</div></section>
-`+footer();
+  <section class="battle-controls" aria-label="行動選択">
+    <div id="actionDescription" class="action-description hidden" role="tooltip"></div>
+    <div class="action-icons">
+      <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-label="武器 ${esc(c.weapon.name)}" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""><span class="action-number">武器</span></button><span class="action-state">標準実行</span><span class="action-wear">破損 ―</span></div>
+      ${c.memories.map((m,i)=>renderMemory(c,m,i)).join("")}
+    </div>
+    <div class="hold-hint">タップ：実行 / 長押し：詳細</div>
+  </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
-  document.querySelector("#weaponBtn").onclick=()=>useWeapon(c);
-  document.querySelectorAll("[data-memory]").forEach(b=>b.onclick=()=>useMemory(c,+b.dataset.memory));
-  const box=document.querySelector("#logBox"); if(box) box.scrollTop=box.scrollHeight;
+  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${calcScaled(c.weapon.basePower,c.stats.STR)} ダメージ / 命中 ${c.weapon.hit}%</p><p>使用するとターン終了。</p><p class="muted">${c.weapon.basePower} × (1 + √STR × 0.12)</p>`,()=>useWeapon(c));
+  document.querySelectorAll("[data-memory]").forEach(button=>{
+    const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
+    bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
+  });
 }
 
 function renderMemory(c,m,i){
-  const d=getMemDef(m);
-  const val=calcScaled(d.basePower,c.stats[d.main]);
-  const unavailable=m.currentCT>0 || m.broken;
-  let effect = d.category==="回復" ? `HPを【${val}】回復` : d.category==="防御" ? `防壁【${val}】を得る` : `敵に【${val}】ダメージ`;
-  return `<button class="btn memory ${m.broken?"broken":""}" data-memory="${i}" ${unavailable?"disabled":""}>
-    <div><span class="tag ${m.broken?"bad":d.execution==="STANDARD"?"std":"inst"}">${m.broken?"BROKEN":d.execution==="STANDARD"?"標準実行":"即時実行"}</span>
-      <span class="title">${esc(d.name)}</span>
-    </div>
-    <div class="meta">${effect}<br>${d.category==="攻撃"?`命中 ${d.hit}%`:"命中判定なし"}</div>
-    <div class="memory-status"><span>CT ${m.currentCT}/${d.ct}</span><span class="wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>
-    <div class="formula">${esc(d.formula)}</div>
-  </button>`;
+  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt=""><span class="action-number">${i+1}</span>${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-state">${m.broken?"BROKEN":`CT ${m.currentCT}/${getMemDef(m).ct}`}</span><span class="action-wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>`;
+}
+function memoryDescription(c,m){
+  const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
+  const effect=d.category==="回復"?`HPを ${val} 回復`:d.category==="防御"?`防壁 ${val} を得る`:`敵に ${val} ダメージ / 命中 ${d.hit}%`;
+  return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
+}
+// A held or cancelled gesture never activates an action on release.
+// aria-disabled keeps cooling/broken memories inspectable while guarding execution.
+function bindActionHold(button,describe,execute){
+  let timer=null,held=false,suppressClick=false,startX=0,startY=0;
+  const box=document.querySelector("#actionDescription");
+  const hide=()=>{clearTimeout(timer);timer=null;box.classList.add("hidden");};
+  const start=()=>{hide();held=false;suppressClick=false;timer=setTimeout(()=>{held=true;suppressClick=true;box.innerHTML=describe();box.classList.remove("hidden");},380);};
+  button.onpointerdown=e=>{
+    if(!e.isPrimary||e.button!==0)return;
+    startX=e.clientX;startY=e.clientY;start();button.setPointerCapture(e.pointerId);
+  };
+  button.onpointermove=e=>{if(timer&&Math.hypot(e.clientX-startX,e.clientY-startY)>12){suppressClick=true;hide();}};
+  button.onpointerup=()=>{if(held)suppressClick=true;hide();};
+  button.onpointercancel=()=>{suppressClick=true;hide();};
+  button.onlostpointercapture=hide;
+  button.oncontextmenu=e=>e.preventDefault();
+  button.onkeydown=e=>{if(e.key==="Enter")suppressClick=false;if(e.key===" "&&!e.repeat)start();};
+  button.onkeyup=e=>{if(e.key===" "){if(held)suppressClick=true;hide();}};
+  button.onblur=()=>{suppressClick=true;hide();};
+  button.onclick=e=>{if(suppressClick){e.preventDefault();suppressClick=false;return;}hide();execute();};
 }
 
 function rollHit(rate){ return Math.random()*100 < rate; }
