@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><path fill="#397f74" d="M7 9h18v18H7z"/><path fill="#8aead0" d="M10 6h12v4H10zm3 7h6v3h4v5h-4v3h-6v-3H9v-5h4z"/><path fill="#d5fbdc" d="M14 14h4v9h-4zm-4 3h12v3H10z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="MEMORY 3 image placeholder">
+<rect x="1" y="1" width="126" height="126" fill="#101012" stroke="#55515a"/>
+<path d="M12 30V12H30 M98 12H116V30 M12 98V116H30 M98 116H116V98" fill="none" stroke="#92515a" stroke-width="2"/>
+<path d="M52.0 42.0H76.0 M64.0 30.0V54.0" stroke="#a3cece" stroke-width="2"/>
+<text x="64.0" y="69.0" text-anchor="middle" fill="#ede8eb" font-family="Arial,sans-serif" font-size="12">MEMORY 3</text>
+<text x="64.0" y="89.0" text-anchor="middle" fill="#b0aab1" font-family="Arial,sans-serif" font-size="10">SAMPLE</text>
+</svg>
