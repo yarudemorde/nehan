@@ -161,3 +161,32 @@ body{line-height:1.4}
 .action-state,.action-wear{font-size:11px;letter-spacing:-.02em}
 .action-icon img,.enemy-figure img,.player-figure img{image-rendering:auto;object-fit:contain}
 .splash span{font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted)}
+
+/* The home menu sits on a rotating vertical cylinder over the supplied city artwork. */
+#app[data-screen="home"]{background:#050505;gap:8px}
+#app[data-screen="home"]:before{opacity:1;background:linear-gradient(180deg,#0007 0%,#0001 32%,#0006 65%,#000d 100%),url('assets/home-city.webp') center/cover no-repeat}
+#app[data-screen="home"] .topline{border-color:#d4c4cc33;background:#0004}
+#app[data-screen="home"] .alpha{background:#080608b8;color:#d4c4cc}
+.home-intro{flex:1;min-height:90px;padding:clamp(12px,4dvh,38px) 8px 0;text-shadow:0 2px 12px #000}
+.home-intro .kicker{color:#d5c1c9;letter-spacing:.18em;font-size:10px}
+.home-intro h1{font-size:clamp(38px,11vw,48px);font-weight:800;letter-spacing:.16em;margin:8px 0 6px;color:#fff2f6}
+.home-intro p{font-size:12px;color:#eddee6;letter-spacing:.06em}
+.home-selector{--drum-radius:118px;flex:none;margin:0 -2px 8px;position:relative}
+.drum-stage{position:relative;height:300px;perspective:750px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;outline-offset:-3px}
+.drum-stage:after{content:"";pointer-events:none;position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,#080508bb,transparent 27%,transparent 73%,#080508bb);border-block:1px solid #b590a033}
+.menu-drum{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .36s cubic-bezier(.2,.8,.2,1)}
+.menu-drum.dragging{transition:none}
+.drum-item{position:absolute;left:6%;top:calc(50% - 41px);width:88%;height:82px;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid #a98b983f;background:linear-gradient(90deg,#100b0f9c,#160e15cf,#100b0f9c);color:#c0abb6;transform:rotateX(var(--face-angle)) translateZ(var(--drum-radius));backface-visibility:hidden;-webkit-backface-visibility:hidden;cursor:pointer;touch-action:none;border-radius:0;padding:8px 4px;opacity:.7}
+.drum-item.selected{opacity:1;color:#fff3f8;background:linear-gradient(90deg,#1c0c149c,#26111de3,#1c0c149c);border-color:#d8aabc99}
+.drum-title{display:block;font-size:24px;font-weight:700;letter-spacing:.13em;line-height:1.2;text-shadow:0 2px 6px #000}
+.drum-meta{display:block;font-size:11px;color:#c6b7c0;letter-spacing:.02em}
+.drum-item.selected .drum-meta{color:#ebdbe4}
+.drum-focus{pointer-events:none;position:absolute;left:3%;right:3%;top:calc(50% - 46px);height:92px;border-block:1px solid #edc0d2;z-index:3;box-shadow:0 0 20px #8e264124}
+.drum-focus:before,.drum-focus:after{position:absolute;top:34px;color:#efc3d5;font-size:13px;content:'›';left:-2px}.drum-focus:after{content:'‹';left:auto;right:-2px}
+.drum-navigation{display:flex;justify-content:center;align-items:center;gap:22px;margin-top:8px}
+.drum-navigation button{width:44px;height:44px;background:#0c090cd9;border:1px solid #c1a0b055;color:#efdae4;cursor:pointer;font-size:18px}
+#drumPosition{color:#e0cad6;letter-spacing:.18em;font-size:11px;text-shadow:0 1px 4px #000}
+.drum-hint{text-align:center;color:#dacbd3;font-size:11px;margin:8px 0 0;text-shadow:0 1px 6px #000}
+#app[data-screen="home"] .footer{color:#cab9c3;text-shadow:0 1px 6px #000}
+@media(max-height:700px){.home-selector{--drum-radius:105px;margin-bottom:0}.drum-stage{height:264px}.home-intro{padding-top:16px}.drum-item{height:76px;top:calc(50% - 38px)}.drum-title{font-size:22px}.drum-focus{height:86px;top:calc(50% - 43px)}}
+@media(prefers-reduced-motion:reduce){.menu-drum{transition:none}}

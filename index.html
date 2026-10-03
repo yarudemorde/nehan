@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.3">
+<link rel="stylesheet" href="style.css?v=0.4">
 <link rel="preload" as="image" href="assets/studio_logo.png">
+<link rel="preload" as="image" href="assets/home-city.webp">
 
 </head>
 <body>
@@ -139,22 +140,85 @@ function render(){
   return renderPlaceholder(state.screen);
 }
 
+let homeSelection=0;
 function renderHome(){
-  el.innerHTML = top()+`
-  <section class="panel home-hero">
-    <div class="kicker">CENTRAL DISTRICT / ACCESS TERMINAL</div>
-    <div class="screen-title">涅槃へ接続する。</div>
-    <p class="muted small">記憶は残る。肉体は残らない。</p>
-  </section>
-  <section class="panel menu grid">
-    <button class="btn primary" data-nav="play"><div class="title">PLAY</div><div class="meta">続きから / キャラクター作成</div></button>
-    <button class="btn" data-nav="inventory"><div class="title">INVENTORY</div><div class="meta">メモリ / モジュール</div></button>
-    <button class="btn" data-nav="shop"><div class="title">SHOP</div><div class="meta">ALPHA: 未実装</div></button>
-    <button class="btn" data-nav="archive"><div class="title">ARCHIVE</div><div class="meta">ALPHA: 未実装</div></button>
-    <button class="btn" data-nav="lost"><div class="title">LOST LOG</div><div class="meta">ALPHA: 未実装</div></button>
-    <button class="btn" data-nav="settings"><div class="title">SETTINGS</div><div class="meta">ALPHA: 未実装</div></button>
-  </section>`+footer();
-  bindNav();
+  const items=[
+    ["play","PLAY","続きから / キャラクター作成"],
+    ["inventory","INVENTORY","メモリ / モジュール"],
+    ["shop","SHOP","ALPHA: 未実装"],
+    ["archive","ARCHIVE","ALPHA: 未実装"],
+    ["lost","LOST LOG","ALPHA: 未実装"],
+    ["settings","SETTINGS","ALPHA: 未実装"]
+  ];
+  el.innerHTML=top()+`
+    <section class="home-intro"><div class="kicker">CENTRAL DISTRICT</div><h1>NEHAN</h1><p>記憶は残る。肉体は残らない。</p></section>
+    <section class="home-selector" aria-label="ホームメニュー">
+      <div class="drum-stage" tabindex="0" role="group" aria-label="上下にスワイプしてメニューを選択。Enterで開く。">
+        <div class="drum-focus" aria-hidden="true"></div>
+        <div class="menu-drum">${items.map(([nav,title,meta],i)=>`<button class="drum-item" data-nav="${nav}" data-drum-index="${i}" style="--face-angle:${-i*60}deg"><span class="drum-title">${title}</span><span class="drum-meta">${meta}</span></button>`).join("")}</div>
+      </div>
+      <div class="drum-navigation"><button id="drumPrev" aria-label="前のメニュー">↑</button><span id="drumPosition" aria-live="polite"></span><button id="drumNext" aria-label="次のメニュー">↓</button></div>
+      <p class="drum-hint">上下にスワイプ / 中央をタップで開く</p>
+    </section>`+footer();
+  const stage=el.querySelector('.drum-stage'), drum=el.querySelector('.menu-drum');
+  const buttons=[...el.querySelectorAll('.drum-item')];
+  let position=homeSelection, drag=null, suppressClick=false, wheelTime=0;
+  const selected=()=>((Math.round(position)%items.length)+items.length)%items.length;
+  function paint(animate=true){
+    drum.classList.toggle('dragging',!animate);
+    drum.style.transform=`translateZ(calc(-1 * var(--drum-radius))) rotateX(${position*60}deg)`;
+    const center=selected();
+    buttons.forEach((b,i)=>{
+      b.classList.toggle('selected',i===center);
+      b.setAttribute('aria-current',i===center?'true':'false');
+      b.tabIndex=i===center?0:-1;
+      // Hide the rear faces from interaction and assistive technology.
+      const angle=((i-position)*60%360+540)%360-180;
+      b.inert=Math.abs(angle)>90;
+    });
+    el.querySelector('#drumPosition').textContent=`0${center+1} / 06`;
+    el.querySelector('#drumPosition').setAttribute('aria-label',`${items[center][1]}、${center+1} / 6`);
+  }
+  function snap(next){position=Math.round(next);homeSelection=selected();paint();}
+  function open(){state.screen=items[selected()][0];save();render();}
+  buttons.forEach((b,i)=>b.onclick=()=>{
+    if(suppressClick){suppressClick=false;return;}
+    if(i===selected()){open();return;}
+    const delta=((i-selected()+9)%6)-3;
+    snap(position+delta);
+  });
+  el.querySelector('#drumPrev').onclick=()=>snap(position-1);
+  el.querySelector('#drumNext').onclick=()=>snap(position+1);
+  stage.onkeydown=e=>{
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();snap(position+(e.key==='ArrowDown'?1:-1));stage.focus();}
+    else if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}
+    else if(e.key==='Home'){e.preventDefault();snap(0);}
+    else if(e.key==='End'){e.preventDefault();snap(5);}
+  };
+  stage.onpointerdown=e=>{
+    if(!e.isPrimary||e.button!==0)return;
+    suppressClick=false;drag={id:e.pointerId,y:e.clientY,start:position,moved:false};
+  };
+  stage.onpointermove=e=>{
+    if(!drag||e.pointerId!==drag.id)return;
+    const distance=e.clientY-drag.y;
+    if(Math.abs(distance)>8&&!drag.moved){drag.moved=true;stage.setPointerCapture(e.pointerId);}
+    if(drag.moved){position=drag.start-distance/90;paint(false);}
+  };
+  function endDrag(e,cancelled=false){
+    if(!drag||e.pointerId!==drag.id)return;
+    const current=drag;drag=null;
+    if(current.moved){suppressClick=true;snap(cancelled?current.start:position);}
+    if(stage.hasPointerCapture(e.pointerId))stage.releasePointerCapture(e.pointerId);
+  }
+  stage.onpointerup=e=>endDrag(e);
+  stage.onpointercancel=e=>endDrag(e,true);
+  stage.onlostpointercapture=e=>endDrag(e,true);
+  stage.addEventListener('wheel',e=>{
+    e.preventDefault();if(Math.abs(e.deltaY)<3||performance.now()-wheelTime<180)return;
+    wheelTime=performance.now();snap(position+Math.sign(e.deltaY));
+  },{passive:false});
+  paint(false);
 }
 
 function renderPlay(){
