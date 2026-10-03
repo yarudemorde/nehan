@@ -127,7 +127,7 @@ function top(){
   return `<div class="topline"><div class="brand">NEHAN</div><div class="alpha">電脳涅槃 / ALPHA</div></div>`;
 }
 function footer(){
-  return `<div class="footer">NEHAN / 記憶は残る。肉体は残らない。</div>`;
+  return `<div class="footer">NEHAN</div>`;
 }
 
 function render(){
@@ -151,14 +151,13 @@ function renderHome(){
     ["settings","SETTINGS","ALPHA: 未実装"]
   ];
   el.innerHTML=top()+`
-    <section class="home-intro"><div class="kicker">CENTRAL DISTRICT</div><h1>NEHAN</h1><p>記憶は残る。肉体は残らない。</p></section>
+    <section class="home-intro"><h1>NEHAN</h1></section>
     <section class="home-selector" aria-label="ホームメニュー">
       <div class="drum-stage" tabindex="0" role="group" aria-label="上下にスワイプしてメニューを選択。Enterで開く。">
         <div class="drum-focus" aria-hidden="true"></div>
         <div class="menu-drum">${items.map(([nav,title,meta],i)=>`<button class="drum-item" data-nav="${nav}" data-drum-index="${i}" style="--face-angle:${-i*60}deg"><span class="drum-title">${title}</span><span class="drum-meta">${meta}</span></button>`).join("")}</div>
       </div>
       <div class="drum-navigation"><button id="drumPrev" aria-label="前のメニュー">↑</button><span id="drumPosition" aria-live="polite"></span><button id="drumNext" aria-label="次のメニュー">↓</button></div>
-      <p class="drum-hint">上下にスワイプ / 中央をタップで開く</p>
     </section>`+footer();
   const stage=el.querySelector('.drum-stage'), drum=el.querySelector('.menu-drum');
   const buttons=[...el.querySelectorAll('.drum-item')];
