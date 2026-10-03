@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges"><path fill="#26344c" d="M5 26L26 5h3v3L8 29H5z"/><path fill="#b7ecde" d="M10 23L26 7h2L12 23z"/><path fill="#51bfae" d="M21 10h3v3h-3z"/><path fill="#be77bd" d="M8 21h4v2h2v2h-4v-2H8z"/><path fill="#7587a2" d="M4 25h3v3H4z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="WEAPON image placeholder">
+<rect x="1" y="1" width="126" height="126" fill="#101012" stroke="#55515a"/>
+<path d="M12 30V12H30 M98 12H116V30 M12 98V116H30 M98 116H116V98" fill="none" stroke="#92515a" stroke-width="2"/>
+<path d="M52.0 42.0H76.0 M64.0 30.0V54.0" stroke="#a3cece" stroke-width="2"/>
+<text x="64.0" y="69.0" text-anchor="middle" fill="#ede8eb" font-family="Arial,sans-serif" font-size="12">WEAPON</text>
+<text x="64.0" y="89.0" text-anchor="middle" fill="#b0aab1" font-family="Arial,sans-serif" font-size="10">SAMPLE</text>
+</svg>
