@@ -150,15 +150,15 @@ function renderHome(){
     ["lost","LOST LOG","ALPHA: 未実装"],
     ["settings","SETTINGS","ALPHA: 未実装"]
   ];
-  el.innerHTML=top()+`
+  el.innerHTML=`
     <section class="home-intro"><h1>NEHAN</h1></section>
     <section class="home-selector" aria-label="ホームメニュー">
       <div class="drum-stage" tabindex="0" role="group" aria-label="上下にスワイプしてメニューを選択。Enterで開く。">
         <div class="drum-focus" aria-hidden="true"></div>
         <div class="menu-drum">${items.map(([nav,title,meta],i)=>`<button class="drum-item" data-nav="${nav}" data-drum-index="${i}" style="--face-angle:${-i*60}deg"><span class="drum-title">${title}</span><span class="drum-meta">${meta}</span></button>`).join("")}</div>
       </div>
-      <div class="drum-navigation"><button id="drumPrev" aria-label="前のメニュー">↑</button><span id="drumPosition" aria-live="polite"></span><button id="drumNext" aria-label="次のメニュー">↓</button></div>
-    </section>`+footer();
+      <div class="drum-navigation"><span id="drumPosition" aria-live="polite"></span></div>
+    </section>`;
   const stage=el.querySelector('.drum-stage'), drum=el.querySelector('.menu-drum');
   const buttons=[...el.querySelectorAll('.drum-item')];
   let position=homeSelection, drag=null, suppressClick=false, wheelTime=0;
@@ -186,8 +186,6 @@ function renderHome(){
     const delta=((i-selected()+9)%6)-3;
     snap(position+delta);
   });
-  el.querySelector('#drumPrev').onclick=()=>snap(position-1);
-  el.querySelector('#drumNext').onclick=()=>snap(position+1);
   stage.onkeydown=e=>{
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();snap(position+(e.key==='ArrowDown'?1:-1));stage.focus();}
     else if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}
