@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071014">
+<title>NEHAN // ALPHA</title>
+<style>
+:root{
+  --bg:#06090c;--panel:#0b1217;--panel2:#0e181e;--line:#20343d;--text:#dfe9e9;--muted:#75858b;
+  --cyan:#72f6ff;--red:#ff5e6c;--amber:#e7ca74;--green:#70e1a1;--purple:#ba8cff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:
+radial-gradient(circle at 50% -20%,#102932 0,#071014 35%,#040608 75%);
+color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Noto Sans JP",monospace}
+body{min-height:100vh}
+button,input{font:inherit}
+button{color:inherit}
+#app{max-width:900px;margin:0 auto;min-height:100vh;padding:14px 14px 40px}
+.topline{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0 16px}
+.brand{font-weight:900;letter-spacing:.25em;color:var(--cyan);font-size:20px;text-shadow:0 0 16px rgba(114,246,255,.4)}
+.alpha{font-size:10px;color:var(--muted);border:1px solid var(--line);padding:4px 7px;letter-spacing:.16em}
+.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(14,24,30,.94),rgba(8,14,18,.96));box-shadow:0 18px 45px rgba(0,0,0,.25);padding:14px;margin-bottom:12px}
+.panel h2,.panel h3{margin:0 0 10px}
+.kicker{font-size:10px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.grid{display:grid;gap:10px}
+.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.stat{border:1px solid var(--line);background:#081015;padding:8px;text-align:center}
+.stat b{display:block;font-size:18px;color:#fff}
+.btn{width:100%;border:1px solid #31505c;background:#0b171d;padding:12px;cursor:pointer;text-align:left;transition:.12s}
+.btn:hover:not(:disabled){border-color:var(--cyan);transform:translateY(-1px)}
+.btn:disabled{opacity:.36;cursor:not-allowed}
+.btn.primary{border-color:#42808c;background:#10272d;color:#ecfeff}
+.btn.danger{border-color:#67303a;background:#221013}
+.btn.ghost{background:transparent}
+.btn .title{font-weight:800}
+.btn .meta{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5}
+.menu .btn{text-transform:uppercase;letter-spacing:.12em}
+.slot{min-height:128px}
+.slot .name{font-size:17px;font-weight:800;margin:5px 0}
+.slot.empty{border-style:dashed}
+.hpbar{height:9px;background:#1b2326;border:1px solid #29383e;overflow:hidden;margin-top:5px}
+.hpbar>i{display:block;height:100%;background:linear-gradient(90deg,#b23e4b,#ff7b86)}
+.shield{color:var(--cyan)}
+.route{position:relative;padding:14px;border:1px solid var(--line);background:#0a1217;cursor:pointer;min-height:165px}
+.route:hover{border-color:var(--cyan)}
+.route .side{font-size:10px;color:var(--cyan);letter-spacing:.16em}
+.route .enemy{font-weight:800;font-size:18px;margin:8px 0}
+.future{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.future span{border:1px dashed #263a42;padding:7px;font-size:10px;color:#93a4a9}
+.intent{border:1px solid #62333a;background:#1a0d11;padding:10px;color:#ffc2c7}
+.combat-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+.tag{display:inline-block;border:1px solid var(--line);padding:2px 5px;font-size:10px;margin-right:4px}
+.tag.std{color:var(--amber);border-color:#665a32}
+.tag.inst{color:var(--cyan);border-color:#2a5960}
+.tag.bad{color:var(--red);border-color:#63313a}
+.memory{position:relative}
+.memory.broken{border-color:#6e303a;background:#190b0e}
+.memrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.formula{font-size:10px;color:#8fb1b7;margin-top:5px;word-break:break-word}
+.log{height:150px;overflow:auto;background:#05090b;border:1px solid #18272d;padding:8px;font-size:11px;line-height:1.55}
+.log div{margin-bottom:3px}
+.log .good{color:var(--green)}
+.log .bad{color:#ff8b95}
+.log .sys{color:var(--cyan)}
+.screen-title{font-size:28px;letter-spacing:.08em;margin:4px 0 6px}
+.rule-note{border-left:2px solid var(--amber);padding-left:10px;color:#aebbbf;font-size:11px;line-height:1.6}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.74);display:flex;align-items:center;justify-content:center;padding:18px;z-index:5}
+.modal-card{max-width:560px;width:100%;border:1px solid #31505c;background:#081116;padding:18px;box-shadow:0 30px 90px #000}
+.hidden{display:none!important}
+input[type="text"]{width:100%;border:1px solid var(--line);background:#050a0d;color:#fff;padding:12px}
+.footer{font-size:10px;color:#526167;margin-top:24px;line-height:1.6}
+@media(max-width:650px){
+  #app{padding:10px 10px 30px}
+  .grid3{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .stat{padding:6px 3px}.stat b{font-size:16px}
+  .memrow{grid-template-columns:1fr}
+  .screen-title{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+"use strict";
+
+const ALPHA = {
+  weaponEndsTurn: true, // TODO(要確認): 正式仕様では未確定。α版では通常攻撃=標準実行として隔離。
+  breakIncreaseMax: 0.5,
+  maxSlots: 3
+};
+
+const MEMORIES = [
+  {
+    id:"M001", name:"破砕", category:"攻撃", rarity:"コモン", ct:2, execution:"STANDARD",
+    basePower:16, main:"STR", hit:65,
+    formula:"16 × (1 + √STR × 0.12)",
+    description:"敵に高威力ダメージ。STRのみで威力計算。命中率は低い。"
+  },
+  {
+    id:"M002", name:"速断", category:"攻撃", rarity:"コモン", ct:1, execution:"INSTANT",
+    basePower:7, main:"DEX", hit:92,
+    formula:"7 × (1 + √DEX × 0.12)",
+    description:"即時実行。軽い攻撃を挟み、ターンを継続する。"
+  },
+  {
+    id:"M003", name:"応急修復", category:"回復", rarity:"アンコモン", ct:3, execution:"STANDARD",
+    basePower:8, main:"INT", hit:100,
+    formula:"8 × (1 + √INT × 0.12)",
+    description:"自身のHPを回復する。"
+  },
+  {
+    id:"M004", name:"防壁展開", category:"防御", rarity:"アンコモン", ct:2, execution:"INSTANT",
+    basePower:6, main:"INT", hit:100,
+    formula:"6 × (1 + √INT × 0.12)",
+    description:"即時実行。次に受けるダメージを軽減する防壁を得る。"
+  }
+];
+
+const ENEMIES = [
+  {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,pattern:["ATTACK","ATTACK","GUARD"]},
+  {id:"E02",name:"違法義体狩り",baseHp:39,atk:8,pattern:["ATTACK","HEAVY","ATTACK"]},
+  {id:"E03",name:"逆接僧兵",baseHp:48,atk:9,pattern:["GUARD","HEAVY","ATTACK"]}
+];
+
+const STORAGE_KEY = "nehan_alpha_v1";
+const el = document.querySelector("#app");
+let state = load() || freshState();
+
+function freshState(){
+  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null};
+}
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function load(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+}
+function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function irand(min,max){ return Math.floor(rand(min,max+1)); }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function statLabel(k){ return {VIT:"体力",STR:"腕力",DEX:"器用",INT:"頭脳"}[k] || k; }
+
+function createCharacter(name){
+  return {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    name: name || "NO-NAME",
+    stats:{VIT:10,STR:8,DEX:8,INT:8},
+    maxHp:42,
+    hp:42,
+    weapon:{id:"W001",name:"鉄管ブレード",basePower:9,hit:90},
+    memories:MEMORIES.map(m=>({
+      definitionId:m.id,currentCT:0,breakageRate:0,broken:false,modules:[]
+    })),
+    depth:0,
+    wins:0,
+    createdAt:Date.now()
+  };
+}
+
+function calcScaled(base, stat){
+  return Math.max(1, Math.round(base * (1 + Math.sqrt(Math.max(0,stat)) * 0.12)));
+}
+function getMemDef(inst){ return MEMORIES.find(m=>m.id===inst.definitionId); }
+
+function newRun(char){
+  char.hp = char.maxHp;
+  char.depth = 0;
+  char.wins = 0;
+  char.memories.forEach(m=>m.currentCT=0);
+  return {
+    depth:0,
+    phase:"map",
+    shield:0,
+    combat:null,
+    routes:makeRoutes(0),
+    log:[]
+  };
+}
+
+function makeRoutes(depth){
+  const mk = side => {
+    const e = ENEMIES[(depth + (side==="R"?1:0)) % ENEMIES.length];
+    const futureA = ENEMIES[(depth+1+(side==="R"?1:0))%ENEMIES.length].name;
+    const futureB = ENEMIES[(depth+2+(side==="R"?1:0))%ENEMIES.length].name;
+    return {side,enemyId:e.id,future:[futureA,futureB]};
+  };
+  return [mk("L"),mk("R")];
+}
+
+function top(){
+  return `<div class="topline"><div class="brand">NEHAN</div><div class="alpha">PLAYABLE ALPHA / 0.1</div></div>`;
+}
+function footer(){
+  return `<div class="footer">NEHAN alpha prototype. 仕様未確定部分は最小限の仮実装としてコード内に隔離しています。保存先: browser localStorage.</div>`;
+}
+
+function render(){
+  if(state.screen==="home") return renderHome();
+  if(state.screen==="play") return renderPlay();
+  if(state.screen==="create") return renderCreate();
+  if(state.screen==="run") return renderRun();
+  if(state.screen==="inventory") return renderInventory();
+  return renderPlaceholder(state.screen);
+}
+
+function renderHome(){
+  el.innerHTML = top()+`
+  <section class="panel">
+    <div class="kicker">CENTRAL DISTRICT / ACCESS TERMINAL</div>
+    <div class="screen-title">涅槃へ接続する。</div>
+    <p class="muted small">記憶は残る。肉体は残らない。</p>
+  </section>
+  <section class="panel menu grid">
+    <button class="btn primary" data-nav="play"><div class="title">PLAY</div><div class="meta">続きから / キャラクター作成</div></button>
+    <button class="btn" data-nav="inventory"><div class="title">INVENTORY</div><div class="meta">メモリ / モジュール</div></button>
+    <button class="btn" data-nav="shop"><div class="title">SHOP</div><div class="meta">ALPHA: 未実装</div></button>
+    <button class="btn" data-nav="archive"><div class="title">ARCHIVE</div><div class="meta">ALPHA: 未実装</div></button>
+    <button class="btn" data-nav="lost"><div class="title">LOST LOG</div><div class="meta">ALPHA: 未実装</div></button>
+    <button class="btn" data-nav="settings"><div class="title">SETTINGS</div><div class="meta">ALPHA: 未実装</div></button>
+  </section>`+footer();
+  bindNav();
+}
+
+function renderPlay(){
+  const slots = state.slots.map((c,i)=>{
+    if(!c) return `<button class="btn slot empty" data-new="${i}"><div class="kicker">SLOT 0${i+1}</div><div class="name">EMPTY</div><div class="meta">新規キャラクター作成</div></button>`;
+    return `<button class="btn slot" data-slot="${i}">
+      <div class="kicker">SLOT 0${i+1}</div>
+      <div class="name">${esc(c.name)}</div>
+      <div class="meta">HP ${c.hp}/${c.maxHp} / STR ${c.stats.STR} / DEX ${c.stats.DEX} / INT ${c.stats.INT}<br>最深部 ${c.depth}</div>
+    </button>`;
+  }).join("");
+  el.innerHTML = top()+`
+  <section class="panel"><div class="kicker">PLAY</div><h2>CHARACTER SLOTS</h2><p class="small muted">最大3体。死亡したキャラクターは消失します。</p></section>
+  <section class="grid grid3">${slots}</section>
+  <button class="btn ghost" data-nav="home">← HOME</button>`+footer();
+  document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.activeSlot=+b.dataset.new;state.screen="create";save();render();});
+  document.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{
+    state.activeSlot=+b.dataset.slot;
+    const c=state.slots[state.activeSlot];
+    if(!state.run || state.run.ownerId!==c.id){
+      state.run=newRun(c); state.run.ownerId=c.id;
+    }
+    state.screen="run"; save(); render();
+  });
+  bindNav();
+}
+
+function renderCreate(){
+  el.innerHTML=top()+`
+  <section class="panel">
+    <div class="kicker">NEW BODY</div><h2>キャラクター作成</h2>
+    <label class="small muted">呼称</label>
+    <input id="nameInput" type="text" maxlength="16" placeholder="NAME" value="名無し">
+    <div style="height:12px"></div>
+    <div class="stats">
+      <div class="stat"><span>VIT</span><b>10</b></div>
+      <div class="stat"><span>STR</span><b>8</b></div>
+      <div class="stat"><span>DEX</span><b>8</b></div>
+      <div class="stat"><span>INT</span><b>8</b></div>
+    </div>
+    <p class="rule-note">ALPHAでは初期ステータスを固定しています。職業・初期値は正式仕様では未確定です。</p>
+    <button class="btn primary" id="createBtn"><div class="title">BODY INITIALIZE</div><div class="meta">この身体でNEHANへ入る</div></button>
+  </section>
+  <button class="btn ghost" data-nav="play">← BACK</button>`+footer();
+  document.querySelector("#createBtn").onclick=()=>{
+    const name=document.querySelector("#nameInput").value.trim()||"名無し";
+    const c=createCharacter(name);
+    state.slots[state.activeSlot]=c;
+    state.run=newRun(c);state.run.ownerId=c.id;state.screen="run";save();render();
+  };
+  bindNav();
+}
+
+function renderRun(){
+  const c=state.slots[state.activeSlot];
+  if(!c){state.screen="play";save();return render();}
+  if(!state.run || state.run.ownerId!==c.id){state.run=newRun(c);state.run.ownerId=c.id;}
+  if(state.run.phase==="combat") return renderCombat(c);
+  if(state.run.phase==="dead") return renderDeath(c);
+  return renderMap(c);
+}
+
+function charHeader(c){
+  return `<section class="panel">
+    <div class="combat-head">
+      <div><div class="kicker">${esc(c.name)} / DEPTH ${state.run.depth}</div><h3 style="margin:3px 0">HP ${c.hp} / ${c.maxHp} ${state.run.shield?`<span class="shield">+ SHIELD ${state.run.shield}</span>`:""}</h3></div>
+      <button class="btn ghost small" id="exitRun" style="width:auto;padding:7px">HOME</button>
+    </div>
+    <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div>
+    <div class="stats" style="margin-top:8px">
+      ${Object.entries(c.stats).map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join("")}
+    </div>
+  </section>`;
+}
+
+function renderMap(c){
+  const routes=state.run.routes;
+  el.innerHTML=top()+charHeader(c)+`
+  <section class="panel">
+    <div class="kicker">ROUTE FORECAST / 2 STEPS</div>
+    <h2>進路を選択</h2>
+    <p class="small muted">左右どちらかへ進む。各ルートのさらに先、2候補まで予告されます。</p>
+    <div class="grid grid2">
+      ${routes.map(r=>{
+        const e=ENEMIES.find(x=>x.id===r.enemyId);
+        return `<div class="route" data-route="${r.side}">
+          <div class="side">${r.side==="L"?"LEFT":"RIGHT"} ROUTE</div>
+          <div class="enemy">${esc(e.name)}</div>
+          <div class="small muted">戦闘ノード / 深度補正 +${state.run.depth}</div>
+          <div class="future"><span>NEXT // ${esc(r.future[0])}</span><span>NEXT // ${esc(r.future[1])}</span></div>
+        </div>`;
+      }).join("")}
+    </div>
+  </section>`+footer();
+  document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
+  document.querySelectorAll("[data-route]").forEach(b=>b.onclick=()=>startCombat(b.dataset.route));
+}
+
+function startCombat(side){
+  const route=state.run.routes.find(r=>r.side===side);
+  const base=ENEMIES.find(e=>e.id===route.enemyId);
+  const d=state.run.depth;
+  const hp=base.baseHp + d*5;
+  state.run.combat={
+    enemy:{...base,maxHp:hp,hp,guard:0,turn:0},
+    intent:null,
+    log:[]
+  };
+  chooseEnemyIntent();
+  state.run.phase="combat";
+  logMsg(`${base.name} と接触。`,"sys");
+  save();render();
+}
+
+function chooseEnemyIntent(){
+  const e=state.run.combat.enemy;
+  const kind=e.pattern[e.turn % e.pattern.length];
+  if(kind==="ATTACK") state.run.combat.intent={kind,damage:e.atk+Math.floor(state.run.depth/2),label:"攻撃"};
+  else if(kind==="HEAVY") state.run.combat.intent={kind,damage:e.atk+4+Math.floor(state.run.depth/2),label:"強攻撃"};
+  else state.run.combat.intent={kind,damage:0,label:"防御"};
+}
+
+function renderCombat(c){
+  const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
+  const memories=c.memories.map((m,i)=>renderMemory(c,m,i)).join("");
+  const weaponDamage=calcScaled(c.weapon.basePower,c.stats.STR);
+  const logs=combat.log.map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("");
+  el.innerHTML=top()+charHeader(c)+`
+  <section class="panel">
+    <div class="kicker">HOSTILE ENTITY</div>
+    <h2>${esc(e.name)}</h2>
+    <div>HP ${e.hp} / ${e.maxHp} ${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}</div>
+    <div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i></div>
+    <div class="intent" style="margin-top:10px">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
+  </section>
+  <section class="panel">
+    <div class="kicker">ACTIONS</div>
+    <h3>武器</h3>
+    <button class="btn primary" id="weaponBtn">
+      <div><span class="tag std">標準実行</span><span class="title">${esc(c.weapon.name)}</span></div>
+      <div class="meta">敵に【${weaponDamage}】ダメージ / 命中率 ${c.weapon.hit}% / 使用後ターン終了</div>
+      <div class="formula">9 × (1 + √STR × 0.12)</div>
+    </button>
+    <h3 style="margin-top:14px">MEMORY // 4 SLOTS</h3>
+    <div class="memrow">${memories}</div>
+  </section>
+  <section class="panel"><div class="kicker">COMBAT LOG</div><div class="log" id="logBox">${logs}</div></section>
+  <section class="rule-note">破損処理順: 現在の破損率で判定 → 使用後に破損率 +0.0〜0.5%。即時実行はターンを終了しません。</section>`+footer();
+  document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
+  document.querySelector("#weaponBtn").onclick=()=>useWeapon(c);
+  document.querySelectorAll("[data-memory]").forEach(b=>b.onclick=()=>useMemory(c,+b.dataset.memory));
+  const box=document.querySelector("#logBox"); if(box) box.scrollTop=box.scrollHeight;
+}
+
+function renderMemory(c,m,i){
+  const d=getMemDef(m);
+  const val=calcScaled(d.basePower,c.stats[d.main]);
+  const unavailable=m.currentCT>0 || m.broken;
+  let effect = d.category==="回復" ? `HPを【${val}】回復` : d.category==="防御" ? `防壁【${val}】を得る` : `敵に【${val}】ダメージ`;
+  return `<button class="btn memory ${m.broken?"broken":""}" data-memory="${i}" ${unavailable?"disabled":""}>
+    <div><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span>
+      <span class="title">${esc(d.name)}</span>
+    </div>
+    <div class="meta">${esc(d.category)} / ${esc(d.rarity)} / CT ${m.currentCT}/${d.ct}<br>${effect} / ${d.category==="攻撃"?`命中率 ${d.hit}%`:"命中判定なし"}<br>破損率 ${m.breakageRate.toFixed(2)}%</div>
+    <div class="formula">${esc(d.formula)}</div>
+    ${m.broken?`<div class="tag bad">BROKEN</div>`:""}
+  </button>`;
+}
+
+function rollHit(rate){ return Math.random()*100 < rate; }
+function applyEnemyDamage(raw){
+  const e=state.run.combat.enemy;
+  let dmg=raw;
+  if(e.guard>0){const cut=Math.min(e.guard,dmg);dmg-=cut;e.guard-=cut;}
+  e.hp=Math.max(0,e.hp-dmg);
+  return dmg;
+}
+function logMsg(text,cls=""){
+  if(!state.run?.combat) return;
+  state.run.combat.log.push({text,cls});
+  if(state.run.combat.log.length>80) state.run.combat.log.shift();
+}
+
+function useWeapon(c){
+  if(!rollHit(c.weapon.hit)){
+    logMsg(`${c.weapon.name}: MISS`,"bad");
+  }else{
+    const raw=calcScaled(c.weapon.basePower,c.stats.STR);
+    const dealt=applyEnemyDamage(raw);
+    logMsg(`${c.weapon.name}: ${dealt} damage`,"good");
+  }
+  if(checkVictory(c)) return;
+  if(ALPHA.weaponEndsTurn) endPlayerTurn(c);
+  else {save();render();}
+}
+
+function useMemory(c,index){
+  const inst=c.memories[index], d=getMemDef(inst);
+  if(inst.currentCT>0 || inst.broken) return;
+
+  // CONFIRMED: 破損判定を先に行う。
+  const broke=Math.random()*100 < inst.breakageRate;
+
+  let resolved=true;
+  if(broke){
+    inst.broken=true;
+    logMsg(`${d.name}: MEMORY BROKEN / 効果消失`,"bad");
+    // TODO(要確認): 正式な破損時効果・同一使用の効果解決順。α版では破損した使用の効果を失敗扱い。
+    resolved=false;
+  }
+
+  if(resolved){
+    const value=calcScaled(d.basePower,c.stats[d.main]);
+    if(d.category==="攻撃"){
+      if(rollHit(d.hit)){
+        const dealt=applyEnemyDamage(value);
+        logMsg(`${d.name}: ${dealt} damage`,"good");
+      }else logMsg(`${d.name}: MISS`,"bad");
+    }else if(d.category==="回復"){
+      const before=c.hp;c.hp=clamp(c.hp+value,0,c.maxHp);
+      logMsg(`${d.name}: HP +${c.hp-before}`,"good");
+    }else if(d.category==="防御"){
+      state.run.shield+=value;
+      logMsg(`${d.name}: SHIELD +${value}`,"good");
+    }
+  }
+
+  inst.currentCT=d.ct;
+  const add=rand(0,ALPHA.breakIncreaseMax);
+  inst.breakageRate=clamp(inst.breakageRate+add,0,100);
+  logMsg(`${d.name}: 破損率 +${add.toFixed(2)}% → ${inst.breakageRate.toFixed(2)}%`,"sys");
+
+  if(checkVictory(c)) return;
+  if(d.execution==="STANDARD") endPlayerTurn(c);
+  else { save(); render(); }
+}
+
+function checkVictory(c){
+  const e=state.run.combat.enemy;
+  if(e.hp>0) return false;
+  logMsg(`${e.name} 排除。`,"good");
+  c.wins++;c.depth=Math.max(c.depth,state.run.depth+1);
+  state.run.depth++;
+  state.run.phase="map";
+  state.run.combat=null;
+  state.run.routes=makeRoutes(state.run.depth);
+  save();
+  showResult("NODE CLEAR",`深度 ${state.run.depth} へ進行した。`,()=>render());
+  return true;
+}
+
+function endPlayerTurn(c){
+  const combat=state.run.combat,e=combat.enemy,intent=combat.intent;
+  if(intent.kind==="ATTACK"||intent.kind==="HEAVY"){
+    let dmg=intent.damage;
+    const cut=Math.min(state.run.shield,dmg);
+    state.run.shield-=cut;dmg-=cut;
+    c.hp=Math.max(0,c.hp-dmg);
+    logMsg(`${e.name}: ${intent.label} / ${dmg} damage${cut?` (SHIELD ${cut})`:""}`,"bad");
+  }else{
+    e.guard+=8+state.run.depth;
+    logMsg(`${e.name}: GUARD +${8+state.run.depth}`,"bad");
+  }
+
+  if(c.hp<=0){
+    state.run.phase="dead";save();return render();
+  }
+
+  e.turn++;
+  chooseEnemyIntent();
+
+  // CONFIRMED: 自分のターン開始時、装備中の全メモリCTを1減らす。
+  c.memories.forEach(m=>m.currentCT=Math.max(0,m.currentCT-1));
+  logMsg("PLAYER TURN // CT -1","sys");
+  save();render();
+}
+
+function renderDeath(c){
+  el.innerHTML=top()+`
+  <section class="panel">
+    <div class="kicker" style="color:var(--red)">CONNECTION LOST</div>
+    <div class="screen-title">肉体反応、停止。</div>
+    <p>${esc(c.name)} は NEHAN 深度 ${state.run.depth} で消失しました。</p>
+    <p class="muted small">進行度報酬とメモリ回収は確定システムですが、報酬名・回収可能数・選択方式が未確定のためα版ではまだ処理しません。</p>
+    <button class="btn danger" id="confirmDeath"><div class="title">ERASE BODY</div><div class="meta">キャラクタースロットを空にする</div></button>
+  </section>`+footer();
+  document.querySelector("#confirmDeath").onclick=()=>{
+    state.slots[state.activeSlot]=null;
+    state.run=null;state.screen="play";save();render();
+  };
+}
+
+function renderInventory(){
+  const owned=state.slots.filter(Boolean);
+  el.innerHTML=top()+`
+  <section class="panel"><div class="kicker">INVENTORY</div><h2>MEMORY / MODULE</h2>
+  <p class="small muted">α版では生存中キャラクターに装備されたメモリ状態のみ確認できます。</p></section>
+  ${owned.length?owned.map(c=>`<section class="panel"><h3>${esc(c.name)}</h3>${c.memories.map(m=>{const d=getMemDef(m);return `<div class="small" style="padding:7px 0;border-top:1px solid var(--line)">${esc(d.name)} / 破損率 ${m.breakageRate.toFixed(2)}% / ${m.broken?"BROKEN":"ACTIVE"}</div>`}).join("")}</section>`).join(""):`<section class="panel muted">保有データなし。</section>`}
+  <button class="btn ghost" data-nav="home">← HOME</button>`+footer();
+  bindNav();
+}
+
+function renderPlaceholder(name){
+  const labels={shop:"SHOP",archive:"ARCHIVE",lost:"LOST LOG",settings:"SETTINGS"};
+  el.innerHTML=top()+`<section class="panel"><div class="kicker">${labels[name]||name}</div><h2>ALPHA // NOT IMPLEMENTED</h2><p class="muted small">仕様が確定してから実装します。</p></section><button class="btn ghost" data-nav="home">← HOME</button>`+footer();
+  bindNav();
+}
+
+function showResult(title,text,after){
+  const div=document.createElement("div");
+  div.className="modal";
+  div.innerHTML=`<div class="modal-card"><div class="kicker">NEHAN SYSTEM</div><h2>${esc(title)}</h2><p>${esc(text)}</p><button class="btn primary" id="modalOk">CONTINUE</button></div>`;
+  document.body.appendChild(div);
+  div.querySelector("#modalOk").onclick=()=>{div.remove();after&&after();};
+}
+
+function bindNav(){
+  document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{state.screen=b.dataset.nav;save();render();});
+}
+
+render();
+})();
+</script>
+</body>
+</html>
