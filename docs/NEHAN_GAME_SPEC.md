@@ -1107,3 +1107,13 @@ When implementing future user instructions:
 // TODO(要確認): Node確率、Scrap Weapon/Memory比率、深度別レア度重みの最終バランス。
 
 // TODO(要確認): EVENT / BLACK_MARKET / BOSS / REST / ELITEの個別仕様は今回追加しない。
+
+## モジュール装着画面への統合 — CONFIRMED (2026-10-04)
+
+- モジュール選択・装着画面は可読性を優先した通常のシステムフォントを使用する。ピクセルフォントは使用しない。
+- MAP・Combatの名前＋HP枠をタップすると、旧Character / Equipment一覧を経由せず専用モジュール装着画面へ直接進む。Home Inventoryの装備項目も同じ画面を開く。
+- 独立した旧武器・Memory詳細ページおよび装備管理オーバーレイは廃止。装着先の情報とSlotは装着画面内で確認する。未選択時は名前・職業・HP・基礎→実効能力を表示する。
+- Memory交換は装着画面の装備Memory選択時のCHANGEから利用できる。個体情報を保持する既存共通処理を使用する。
+- 戦闘中もこの画面を開いて確認可能。Install・Overwrite・Memory交換は無効。既存の戦闘タイマーは継続する。
+- 戻ると元のMAP・Combat・Inventoryへ復帰し、現在のHP・装備を反映する。保存形式、補正式、Install / Overwriteの共通処理は変更しない。
+- この節の導線・画面構成は上記旧Character / Equipment画面に関する記述を置き換える。
