@@ -190,3 +190,9 @@ body{line-height:1.4}
 #app[data-screen="home"] .footer{color:#cab9c3;text-shadow:0 1px 6px #000}
 @media(max-height:700px){.home-selector{--drum-radius:105px;margin-bottom:0}.drum-stage{height:264px}.home-intro{padding-top:16px}.drum-item{height:76px;top:calc(50% - 38px)}.drum-title{font-size:22px}.drum-focus{height:86px;top:calc(50% - 43px)}}
 @media(prefers-reduced-motion:reduce){.menu-drum{transition:none}}
+
+/* Give combat the full portrait area on a plain black stage. */
+body:has(#app[data-screen="combat"]){background:#000}
+#app[data-screen="combat"]{background:#000;border:0;box-shadow:none;padding:env(safe-area-inset-top) max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}
+#app[data-screen="combat"]:before{display:none}
+#app[data-screen="combat"] .battle-scene{background:#000;border:0;box-shadow:none}

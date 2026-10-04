@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.4">
+<link rel="stylesheet" href="style.css?v=0.5">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -341,7 +341,7 @@ function chooseEnemyIntent(){
 function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
   const enemyArt={E01:"sentinel",E02:"hunter",E03:"monk"}[e.id]||"sentinel";
-  el.innerHTML=top()+`
+  el.innerHTML=`
   <section class="battle-scene">
     <div class="battle-heading"><span class="kicker">DEPTH ${state.run.depth} / BATTLE</span><button class="btn ghost small" id="exitRun">HOME</button></div>
     <div class="enemy-figure"><div class="kicker">${esc(e.name)}</div><img src="assets/${enemyArt}.svg" alt="${esc(e.name)}"></div>
