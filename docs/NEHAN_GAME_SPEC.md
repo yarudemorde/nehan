@@ -538,7 +538,7 @@ When that Memory is recovered after character death, its installed Modules are i
 
 ## 7.4 Module details — PARTIALLY CONFIRMED
 
-Rarity-based slots (1–5), weapon/Memory installation, permanent installation and VIT/STR/DEX/INT flat/percent effects are confirmed in the 2026-10-04 addendum below.
+Rarity-based slots (1–5), weapon/Memory installation, destructive overwrite without removal, generated instance effects, VIT/STR/DEX/INT/MAX_HP and item-local BASE_POWER flat/percent effects are confirmed in the 2026-10-04 addenda below.
 
 Not yet decided:
 - whether duplicate Modules can be installed
@@ -943,9 +943,7 @@ These should remain visible in issues/code comments/spec tasks rather than being
 
 ## Module
 
-- Module slot count per Memory.
-- Module installation/removal rules.
-- Duplicate rules.
+- Duplicate rules beyond preserving individually owned instances.
 - Rarity.
 - Exact stat-growth scale.
 
@@ -1019,14 +1017,14 @@ When implementing future user instructions:
 - Module は `MODULES` から抽選する。将来の敵別 `modulePool` にも対応。レア度の抽選ルールは追加せず、各定義の既存レア度を引き継ぐ。
 - `c.memories` は装備中の4個。未装備メモリは `c.inventory.memories`、未使用Moduleは `c.inventory.modules` に保存する。同じメモリ定義の複数個体を所持でき、`instanceId` で区別する。
 - 武器・メモリ個体は `instanceId / rarity / moduleSlots / modules` を持つ。COMMON=1、UNCOMMON=2、RARE=3、EPIC=4、LEGENDARY=5スロット。初期鉄管ブレードはCOMMON、1スロット。
-- Module個体は `instanceId / definitionId`、静的定義は `id / name / rarity / effects[]`。effects は stat(VIT/STR/DEX/INT)、mode(flat/percent)、valueを保持する。
-- 筋力増幅回路（MOD001、COMMON）：STR +10%、DEX -5。違法筋繊維（MOD002、COMMON）：STR +5、DEX -5%。
-- 武器・装備メモリ・所持メモリへ空きスロットがある場合だけ装着可能。確認後、未使用Moduleの同じ個体を対象へ移動して保存する。取り外し・交換・上書きは不可。
+- Module個体は `instanceId / definitionId / rarity / generatedDepth / effectCount / effects[]` を保持する。静的定義は `id / name / rarity / allowedEffects / preferredTargets / legacyEffects` とし、生成ルールと個体性能を分離する。
+- 筋力増幅回路（MOD001）と違法筋繊維（MOD002）の既存COMMONレア度を維持する。旧固定効果（STR +10% / DEX -5、STR +5 / DEX -5%）は旧セーブ補完専用とし、新規個体の効果は生成時に確定する。
+- 武器・装備メモリ・所持メモリの空きスロットにはINSTALL、使用中スロットにはOVERWRITEが可能。確認後、未使用Moduleの同じ個体を対象スロットへ移動して保存する。単独取り外しは禁止。上書きされた旧Moduleは消失し、Inventoryへ戻らない。
 - `c.stats` は基礎値として変更しない。`getEffectiveStats(c)` は装備武器と装備メモリのModuleだけを集計し、`max(0, round((base + flat合計) × (1 + percent合計 / 100)))` を計算する。未装備アイテムは補正対象外。
-- 例：基礎STR20/DEX20、装備武器に筋力増幅回路、装備破砕に違法筋繊維 → STR28、DEX14。補正値は武器・メモリ威力と長押し詳細へ反映し、HPの算出式は変更しない。
+- 旧固定効果の例：基礎STR20/DEX20、装備武器に筋力増幅回路、装備破砕に違法筋繊維 → STR28、DEX14。新規個体は保存済みのeffectsで計算する。基礎HP42の仕様は維持し、MAX_HP Moduleによる実効最大HPを別途計算する。
 - INVENTORYはEQUIPPED / STORAGE MEMORIES / STORAGE MODULESを表示し、基礎値→補正値、容量、装着Moduleを確認できる。一覧内部のみスクロールし、下部HOMEと画面全体は固定する。
 - 保存キー `nehan_alpha_v1` を維持する。旧アイテムは欠落していたID・レア度・容量・配列を補完する。既存HP、基礎ステータス、CT、破損状態、装着済みModuleは削除しない。未定義の旧Moduleは表示・保持し、未知の効果を推測して適用しない。
-- 死亡後の共通倉庫への回収、倉庫上限、追加レアドロップ分布、HP・命中率・CT・破損率のModule補正は今回未実装・未確定。既存の死亡・戦闘基本仕様を維持する。
+- 死亡後の共通倉庫への回収、倉庫上限、追加レアドロップ分布、命中率・CT・破損率のModule補正は今回未実装・未確定。既存の死亡・戦闘基本仕様を維持する。
 
 
 ## 追加確定仕様：Character / Equipment — CONFIRMED (2026-10-04)
@@ -1035,9 +1033,38 @@ When implementing future user instructions:
 - MAP・Combatの名前＋HP枠（`#playerDetails`）はタップで管理画面へ進む。既存長押し簡易ステータス表示は維持する。
 - 管理画面では名前・職業・HP/MAX HP・VIT/STR/DEX/INTの基礎値→補正値、武器1個と装備Memory4個を表示する。`getEffectiveStats()` と装備詳細描画はHome Inventoryと共用する。
 - 武器詳細は名前・レア度・武器種・POWER・MAIN STAT・HIT・HIT COUNT・装着Moduleを表示する。Memory詳細は名前・レア度・カテゴリ・実行種別・basePower/main/hit・CT・破損率・BROKEN・説明・装着Moduleを表示する。
-- Module枠は最大5個を ■/□ で表示する。MAPで□を押すと未使用Module一覧を開き、既存不可逆Install確認へ進む。取り外し・交換・上書きは追加しない。
+- Module枠は最大5個を ■/□ で表示する。MAPで□を押すと未使用Module一覧を開き、既存不可逆Install確認へ進む。単独取り外しは不可。使用中スロットからは個体詳細と不可逆OVERWRITE確認を開く。
 - MAPで装備Memory詳細のCHANGEからStorage個体を選び、装備中個体と所持個体を交換する。`instanceId / rarity / modules / currentCT / breakageRate / broken` はそのまま移動し、定義だけを変更しない。装備数は必ず4個。
 - 個体がStorageへ移った時点でそのModule補正は除外され、新たに装備した個体のModuleだけを集計する。`c.stats` は変更しない。
-- Combatでは詳細・Module確認だけ可能。Memory CHANGE・Module Installを無効にし、共通mutation関数も拒否する。Home Inventoryからも進行中Combatキャラクターへの変更は不可。別キャラクターへの変更は進行中の戦闘に影響しない。
+- Combatでは詳細・Module確認だけ可能。Memory CHANGE・Module Install・Module Overwriteを無効にし、共通mutation関数も拒否する。Home Inventoryからも進行中Combatキャラクターへの変更は不可。別キャラクターへの変更は進行中の戦闘に影響しない。
 - 管理画面を開いても戦闘タイマーを停止・変更しない。背景の戦闘が解決した場合、閉じると現在のHPとフェーズへ戻る。
 - 保存キー・ドロップ20/80・不可逆Install・補正式・基本ダメージ式・CT・破損仕様を維持する。管理画面はsafe-areaを考慮し、内部一覧だけスクロールする。
+
+
+## 追加確定仕様：生成Module・最大HP・装着先威力・Overwrite — CONFIRMED (2026-10-04)
+
+- 敵撃破ドロップ率はMEMORY 20% / MODULE 80%を維持する。Module生成には撃破した時点の深度を渡し、次のMAP深度を使わない。生成された性能を戦利品と一緒に保存し、load時には再抽選しない。
+- Module Instanceの `effects[]` は `{target, mode, value}`。targetはVIT / STR / DEX / INT / MAX_HP / BASE_POWER、modeはflat / percent。全対象について正負の生成候補を持つ。新規個体は最低1・最大4効果で、同じtargetを重複生成しない。先頭効果は正、後続効果は負にもなり得る。
+- キャラクター能力とMAX_HPは装備武器＋装備中4MemoryのModuleだけを集計する。Storage Memoryは対象外。計算順は基礎値→flat合計→percent合計→四捨五入。能力は最低0、実効最大HPは最低1。`c.stats` と `c.maxHp` は基礎値として維持する。
+- `getEffectiveMaxHp(c)` をHP表示、回復上限、新Run開始の全回復に使用する。Install / Overwrite / Memory交換で実効最大HPが下がった場合だけ現在HPを上限へ制限する。最大HPが増えても現在HPは増やさない。
+- BASE_POWERはそのModuleが付いている武器またはMemoryだけへ適用する。他アイテムへ波及しない。武器・Memoryは `getEffectiveBasePower(item)` と既存能力スケーリングを使用し、基本ダメージ式、CT、破損率、STANDARD / INSTANT、敵AI、行動タイミングは変更しない。
+- 装着済みModuleは `slotIndex`（0始まり）を保持する。`modules[]` の配列順ではなくslotIndexでSLOT 1〜5を指定する。容量は従来どおりレア度により1〜5。空きスロットへはINSTALL、使用中スロットへは旧個体IDを再検証してOVERWRITEする共通ロジックを通す。
+- OVERWRITEは旧Moduleの完全消失と未使用新Moduleの消費を伴う。単独REMOVE / UNINSTALL / EXTRACT、旧Moduleの回収、空スロットへの復元は実装しない。Combat中はInstallとOverwriteの両方を共通処理でも拒否する。
+- UIは実際のInstance効果、レア度、取得深度、各SLOTの内容を表示する。使用中SLOTの詳細からOVERWRITEへ進める。確認で旧個体と新個体の効果、消失・不可逆の警告を表示する。Character / Equipment詳細は能力と基礎攻撃力の基礎値→実効値、現在HP / 実効最大HPを表示する。
+- 旧詰め配列の装着Moduleは順にslotIndex 0、1…へ割り当てる。既に明示されたslotIndexと個体は維持する。Instanceにeffectsがない旧Moduleは `legacyEffects` を一度複製して保存する。旧 `stat` キーはtargetへ変換する。取得深度不明はnull / 未記録とし、推測して生成し直さない。未知定義の旧個体も消さず保持する。
+
+### 深度生成：現行実装パラメータ（最終バランスはTODO / 要確認）
+
+数値スケールは `1 + min(60, max(0, depth)) × 0.03`、上限2.8。各効果の生成値は基本乱数幅×スケールを四捨五入し、絶対値最低1とする。負効果は倍率0.55。基本幅は能力flat 3〜6、MAX_HP flat 6〜12、BASE_POWER flat 1〜3、percent共通6〜12。後続効果の負効果確率は `min(0.35, 0.15 + min(60, depth) × 0.003)`。定義のpreferredTargetsは抽選重み2、それ以外は1。Module自体の既存レア度は変更しない。
+
+| 取得深度 | 効果数の重み |
+| --- | --- |
+| 0〜4 | 1個85% / 2個15% |
+| 5〜9 | 1個35% / 2個65% |
+| 10〜19 | 2個65% / 3個35% |
+| 20〜29 | 2個25% / 3個45% / 4個30% |
+| 30以上 | 3個35% / 4個65% |
+
+// TODO(要確認): 生成値の範囲・深度スケール上限・効果数と負効果の抽選重みの最終バランス。
+
+// TODO(要確認): Module補正後BASE_POWERの正式な最低値。現行は入力値を最低0とし、既存calcScaledの最低ダメージ1を維持する。

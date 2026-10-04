@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=1.0">
+<link rel="stylesheet" href="style.css?v=1.1">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -70,7 +70,7 @@ function canEquipWeapon(job,weapon){
 }
 function weaponTypeLabel(type){return {BLADE:"刃物",LEGACY:"未設定"}[type]||type;}
 function weaponStatKey(weapon){return weapon.mainStat||"STR";}
-function weaponPower(c){return calcScaled(c.weapon.basePower,getEffectiveStats(c)[weaponStatKey(c.weapon)]);}
+function weaponPower(c){return calcScaled(getEffectiveBasePower(c.weapon),getEffectiveStats(c)[weaponStatKey(c.weapon)]);}
 
 const ENEMIES = [
   {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,memoryPool:["M002","M004"],pattern:["ATTACK","ATTACK","GUARD"]},
@@ -79,44 +79,97 @@ const ENEMIES = [
 ];
 
 // Definitions never contain installed or player-owned state.
+const MODULE_EFFECT_RULES=Object.fromEntries(["VIT","STR","DEX","INT","MAX_HP","BASE_POWER"].flatMap(target=>["flat","percent"].map(mode=>[`${target}_${mode.toUpperCase()}`,{target,mode,min:mode==="percent"?6:target==="MAX_HP"?6:target==="BASE_POWER"?1:3,max:mode==="percent"?12:target==="MAX_HP"?12:target==="BASE_POWER"?3:6}])));
 const MODULES = [
-  {id:"MOD001",name:"筋力増幅回路",rarity:"COMMON",effects:[{stat:"STR",mode:"percent",value:10},{stat:"DEX",mode:"flat",value:-5}]},
-  {id:"MOD002",name:"違法筋繊維",rarity:"COMMON",effects:[{stat:"STR",mode:"flat",value:5},{stat:"DEX",mode:"percent",value:-5}]}
+  {id:"MOD001",name:"筋力増幅回路",rarity:"COMMON",preferredTargets:["STR","BASE_POWER"],allowedEffects:Object.keys(MODULE_EFFECT_RULES),legacyEffects:[{target:"STR",mode:"percent",value:10},{target:"DEX",mode:"flat",value:-5}]},
+  {id:"MOD002",name:"違法筋繊維",rarity:"COMMON",preferredTargets:["STR","VIT"],allowedEffects:Object.keys(MODULE_EFFECT_RULES),legacyEffects:[{target:"STR",mode:"flat",value:5},{target:"DEX",mode:"percent",value:-5}]}
 ];
 const RARITY_SLOTS={COMMON:1,UNCOMMON:2,RARE:3,EPIC:4,LEGENDARY:5};
 function canonicalRarity(value){return {コモン:"COMMON",アンコモン:"UNCOMMON",レア:"RARE",エピック:"EPIC",レジェンダリー:"LEGENDARY"}[value]||(Object.hasOwn(RARITY_SLOTS,value)?value:"COMMON");}
 function itemId(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+function getModuleDef(instance){return MODULES.find(m=>m.id===instance?.definitionId);}
+function normalizeModule(m){
+  m.instanceId??=itemId();m.definitionId??=m.id;
+  const d=getModuleDef(m);m.rarity=canonicalRarity(m.rarity||d?.rarity);m.generatedDepth??=null;
+  // Missing legacy effects are snapshotted once; loading never generates new rolls.
+  const effects=Array.isArray(m.effects)?m.effects:(d?.legacyEffects||[]);
+  m.effects=effects.map(e=>({...e,target:e.target||e.stat}));m.effectCount=m.effects.length;
+  return m;
+}
 function normalizeItem(item,rarity){
   item.instanceId??=itemId();item.rarity=canonicalRarity(item.rarity||rarity);
   item.moduleSlots=RARITY_SLOTS[item.rarity];item.modules??=[];
-  item.modules.forEach(m=>{m.instanceId??=itemId();m.definitionId??=m.id;});
-  return item;
+  const used=new Set();
+  item.modules.forEach((m,i)=>{
+    if(!m)return;normalizeModule(m);
+    if(!Number.isInteger(m.slotIndex)||m.slotIndex<0||used.has(m.slotIndex)){
+      let slot=i;while(used.has(slot))slot++;m.slotIndex=slot;
+    }used.add(m.slotIndex);
+  });
+  // Accept legacy sparse arrays without deleting any installed instance.
+  item.modules=item.modules.filter(Boolean);return item;
 }
 function createMemoryInstance(definitionId){
   const d=MEMORIES.find(x=>x.id===definitionId);
   return normalizeItem({definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]},d.rarity);
 }
-function createModuleInstance(definitionId){return {instanceId:itemId(),definitionId};}
-function getModuleDef(instance){return MODULES.find(m=>m.id===instance.definitionId);}
-function getEffectiveStats(c){
-  const flat={},percent={};
-  [c.weapon,...c.memories].filter(Boolean).forEach(item=>(item.modules||[]).forEach(m=>{
-    (getModuleDef(m)?.effects||[]).forEach(e=>{
-      if(!["VIT","STR","DEX","INT"].includes(e.stat)||!Number.isFinite(e.value))return;
-      const totals=e.mode==="flat"?flat:e.mode==="percent"?percent:null;
-      if(totals)totals[e.stat]=(totals[e.stat]||0)+e.value;
-    });
-  }));
-  return Object.fromEntries(Object.entries(c.stats).map(([k,v])=>[k,Math.max(0,Math.round((v+(flat[k]||0))*(1+(percent[k]||0)/100)))]));
+function weightedChoice(entries,rng){
+  const total=entries.reduce((n,e)=>n+e.weight,0);let roll=rng()*total;
+  for(const e of entries){roll-=e.weight;if(roll<0)return e.value;}
+  return entries.at(-1).value;
 }
+// TODO(要確認): 深度補正・効果数の抽選重み・数値レンジの最終バランス。
+function modulePowerScale(depth){return 1+Math.min(60,Math.max(0,depth))*.03;}
+function moduleEffectCount(depth,rng){
+  const weights=depth<5?[[1,85],[2,15]]:depth<10?[[1,35],[2,65]]:depth<20?[[2,65],[3,35]]:depth<30?[[2,25],[3,45],[4,30]]:[[3,35],[4,65]];
+  return weightedChoice(weights.map(([value,weight])=>({value,weight})),rng);
+}
+function createModuleInstance(definitionId,depth=0,rng=Math.random){
+  const d=MODULES.find(m=>m.id===definitionId);if(!d)throw new Error("Unknown ModuleDefinition");
+  const generatedDepth=Math.max(0,Math.floor(Number(depth)||0)),count=moduleEffectCount(generatedDepth,rng),scale=modulePowerScale(generatedDepth),effects=[];
+  let pool=d.allowedEffects.map(key=>MODULE_EFFECT_RULES[key]).filter(Boolean);
+  for(let i=0;i<count&&pool.length;i++){
+    const rule=weightedChoice(pool.map(value=>({value,weight:d.preferredTargets.includes(value.target)?2:1})),rng);
+    // A Module always has a positive first effect. Later effects can be penalties.
+    const negative=i>0&&rng()<Math.min(.35,.15+Math.min(60,generatedDepth)*.003);
+    const magnitude=Math.max(1,Math.round((rule.min+rng()*(rule.max-rule.min))*scale*(negative?.55:1)));
+    effects.push({target:rule.target,mode:rule.mode,value:negative?-magnitude:magnitude});
+    pool=pool.filter(e=>e.target!==rule.target);
+  }
+  return {instanceId:itemId(),definitionId,rarity:d.rarity,generatedDepth,effectCount:effects.length,effects};
+}
+function getModuleEffects(m){return m?.effects||getModuleDef(m)?.legacyEffects||[];}
+function equippedModules(c){return [c.weapon,...c.memories].filter(Boolean).flatMap(item=>item.modules||[]).filter(Boolean);}
+function applyModuleModifiers(base,target,modules,minimum=0){
+  let flat=0,percent=0;
+  modules.forEach(m=>getModuleEffects(m).forEach(e=>{
+    if((e.target||e.stat)!==target||!Number.isFinite(e.value))return;
+    if(e.mode==="flat")flat+=e.value;else if(e.mode==="percent")percent+=e.value;
+  }));
+  return Math.max(minimum,Math.round((base+flat)*(1+percent/100)));
+}
+function getEffectiveStats(c){
+  const modules=equippedModules(c);
+  return Object.fromEntries(Object.entries(c.stats).map(([k,v])=>[k,applyModuleModifiers(v,k,modules)]));
+}
+function getEffectiveMaxHp(c){return applyModuleModifiers(c.maxHp,"MAX_HP",equippedModules(c),1);}
+function getEffectiveBasePower(item){
+  const base=item.basePower??getMemDef(item)?.basePower??0;
+  // TODO(要確認): 基礎威力補正の正式下限。暫定0、既存calcScaledの最小効果1は維持。
+  return applyModuleModifiers(base,"BASE_POWER",(item.modules||[]).filter(Boolean));
+}
+function clampCharacterHp(c){c.hp=Math.min(c.hp,getEffectiveMaxHp(c));}
+function moduleAtSlot(item,slot){return item.modules.find((m,i)=>m&&(m.slotIndex??i)===slot);}
+function firstEmptyModuleSlot(item){for(let i=0;i<item.moduleSlots;i++)if(!moduleAtSlot(item,i))return i;return -1;}
+function basePowerDescription(item){const base=item.basePower??getMemDef(item)?.basePower??0,effective=getEffectiveBasePower(item);return `${base}${base!==effective?` → ${effective}`:""}`;}
 function statsDescription(c){const effective=getEffectiveStats(c);return Object.entries(c.stats).map(([k,v])=>`${k} ${v}${effective[k]!==v?` → ${effective[k]}`:""}`).join(" / ");}
-function generateLoot(enemy,rng=Math.random){
+function generateLoot(enemy,rng=Math.random,depth=state.run?.depth||0){
   const definition=ENEMIES.find(e=>e.id===enemy.id)||enemy;
   const pool=(definition.memoryPool||[]).filter(id=>MEMORIES.some(m=>m.id===id));
   if(rng()<.2&&pool.length)return {type:"MEMORY",item:createMemoryInstance(pool[Math.floor(rng()*pool.length)])};
   const modulePool=definition.modulePool?MODULES.filter(m=>definition.modulePool.includes(m.id)):MODULES;
   const candidates=modulePool.length?modulePool:MODULES;
-  return {type:"MODULE",item:createModuleInstance(candidates[Math.floor(rng()*candidates.length)].id)};
+  return {type:"MODULE",item:createModuleInstance(candidates[Math.floor(rng()*candidates.length)].id,depth,rng)};
 }
 function installTargets(c){return [c.weapon,...c.memories,...c.inventory.memories].filter(Boolean);}
 function canModifyEquipment(c){return !(state.run?.ownerId===c.id&&state.run.phase==="combat");}
@@ -127,14 +180,25 @@ function swapMemory(c,index,storageId){
   const equipped=c.memories[index],stored=c.inventory.memories[storedIndex];
   if(c.memories.some(m=>m.instanceId===stored.instanceId))return false;
   // Move complete instances: never rebuild from the MemoryDefinition.
-  c.memories[index]=stored;c.inventory.memories[storedIndex]=equipped;save();return true;
+  c.memories[index]=stored;c.inventory.memories[storedIndex]=equipped;clampCharacterHp(c);save();return true;
 }
-function installModule(c,moduleId,targetId){
+function commitModuleSlot(c,moduleId,targetId,slot,overwrite,expectedOldId=null){
   if(!canModifyEquipment(c))return false;
-  // Resolve again at commit time: stale confirmations cannot consume an instance twice.
   const index=c.inventory.modules.findIndex(m=>m.instanceId===moduleId),target=installTargets(c).find(i=>i.instanceId===targetId);
-  if(index<0||!target||target.modules.length>=target.moduleSlots||!getModuleDef(c.inventory.modules[index]))return false;
-  target.modules.push(c.inventory.modules.splice(index,1)[0]);save();return true;
+  if(index<0||!target||!getModuleDef(c.inventory.modules[index])||!Number.isInteger(slot)||slot<0||slot>=target.moduleSlots)return false;
+  const old=moduleAtSlot(target,slot);
+  if(overwrite?(!old||!expectedOldId||old.instanceId!==expectedOldId):!!old)return false;
+  if(!overwrite&&target.modules.length>=target.moduleSlots)return false;
+  const incoming=c.inventory.modules.splice(index,1)[0];normalizeModule(incoming);incoming.slotIndex=slot;
+  if(old)target.modules[target.modules.indexOf(old)]=incoming;else target.modules.push(incoming);
+  clampCharacterHp(c);save();return true;
+}
+function installModule(c,moduleId,targetId,slotIndex=null){
+  const target=installTargets(c).find(i=>i.instanceId===targetId);
+  return !!target&&commitModuleSlot(c,moduleId,targetId,slotIndex??firstEmptyModuleSlot(target),false);
+}
+function overwriteModule(c,moduleId,targetId,slotIndex,expectedOldId){
+  return commitModuleSlot(c,moduleId,targetId,slotIndex,true,expectedOldId);
 }
 function collectLoot(c){
   if(state.run?.ownerId!==c.id||state.run.phase!=="loot"||!state.run.loot)return false;
@@ -168,13 +232,15 @@ function normalizeState(saved){
     c.jobId??="LEGACY";
     c.inventory??={memories:[],modules:[]};c.inventory.memories??=[];c.inventory.modules??=[];
     [...c.memories,...c.inventory.memories].forEach(m=>normalizeItem(m,getMemDef(m)?.rarity));
-    c.inventory.modules.forEach(m=>{m.instanceId??=itemId();m.definitionId??=m.id;});
+    c.inventory.modules.forEach(normalizeModule);
     if(c.weapon){
       c.weapon.mainStat??="STR";c.weapon.hitCount??=1;
       c.weapon.weaponType??="LEGACY";normalizeItem(c.weapon,"COMMON");
     }
+    clampCharacterHp(c);
   });
   if(saved.run?.loot?.type==="MEMORY")normalizeItem(saved.run.loot.item,getMemDef(saved.run.loot.item)?.rarity);
+  if(saved.run?.loot?.type==="MODULE")normalizeModule(saved.run.loot.item);
   saved.createDraft??=null;
   return saved;
 }
@@ -207,7 +273,7 @@ function getMemDef(inst){ return MEMORIES.find(m=>m.id===inst.definitionId); }
 function memoryIcon(inst){const d=getMemDef(inst);return d.icon||`assets/action-${MEMORIES.indexOf(d)+1}.svg`;}
 
 function newRun(char){
-  char.hp = char.maxHp;
+  char.hp = getEffectiveMaxHp(char);
   char.depth = 0;
   char.wins = 0;
   char.memories.forEach(m=>m.currentCT=0);
@@ -332,7 +398,7 @@ function renderPlay(){
     return `<button class="btn slot" data-slot="${i}">
       <div class="kicker">SLOT 0${i+1}</div>
       <div class="name">${esc(c.name)}</div>
-      <div class="meta">${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}<br>HP ${c.hp}/${c.maxHp} / STR ${c.stats.STR} / DEX ${c.stats.DEX} / INT ${c.stats.INT}<br>最深部 ${c.depth}</div>
+      <div class="meta">${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}<br>HP ${c.hp}/${getEffectiveMaxHp(c)} / STR ${c.stats.STR} / DEX ${c.stats.DEX} / INT ${c.stats.INT}<br>最深部 ${c.depth}</div>
     </button>`;
   }).join("");
   el.innerHTML = top()+`
@@ -428,10 +494,10 @@ function renderRun(){
 function charHeader(c){
   return `<section class="panel player-panel">
     <div class="combat-head">
-      <div><div class="kicker">${esc(c.name)} / DEPTH ${state.run.depth}</div><h3 style="margin:3px 0">HP ${c.hp} / ${c.maxHp} ${state.run.shield?`<span class="shield">+ SHIELD ${state.run.shield}</span>`:""}</h3></div>
+      <div><div class="kicker">${esc(c.name)} / DEPTH ${state.run.depth}</div><h3 style="margin:3px 0">HP ${c.hp} / ${getEffectiveMaxHp(c)} ${state.run.shield?`<span class="shield">+ SHIELD ${state.run.shield}</span>`:""}</h3></div>
       <button class="btn ghost small" id="exitRun" style="width:auto;padding:7px">HOME</button>
     </div>
-    <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div>
+    <div class="hpbar"><i style="width:${clamp(c.hp/getEffectiveMaxHp(c)*100,0,100)}%"></i></div>
     <div class="stats" style="margin-top:8px">
       ${Object.entries(c.stats).map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join("")}
     </div>
@@ -460,7 +526,7 @@ function renderMap(c){
       </div>
       <button class="player-status player-health" id="playerDetails" aria-label="キャラクター・装備管理" aria-describedby="actionDescription">
         <div class="battle-name">${esc(c.name)}</div>
-        <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
+        <div class="hpbar"><i style="width:${clamp(c.hp/getEffectiveMaxHp(c)*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${getEffectiveMaxHp(c)}</span></div>
         <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
       </button>
       <section class="battle-controls map-equipment" aria-label="装備確認">
@@ -481,7 +547,7 @@ function renderMap(c){
     bindActionHold(button,()=>`<b>次の候補</b><p>戦闘</p>`,()=>{});
   });
   bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>`戦闘 → ${r.future.map(()=>"戦闘").join(" / ")}`).join("<br>")}</p>`,()=>{});
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${getEffectiveMaxHp(c)} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
   bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${weaponPower(c)} / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p>`,()=>{});
   document.querySelectorAll("[data-memory]").forEach(button=>{
     bindActionHold(button,()=>memoryDescription(c,c.memories[+button.dataset.memory]),()=>{});
@@ -536,7 +602,7 @@ function renderCombat(c){
       <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}</div>
       <button class="player-status player-health" id="playerDetails" aria-label="キャラクター・装備管理" aria-describedby="actionDescription">
         <div class="battle-name">${esc(c.name)}</div>
-        <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
+        <div class="hpbar"><i style="width:${clamp(c.hp/getEffectiveMaxHp(c)*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${getEffectiveMaxHp(c)}</span></div>
         <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
       </button>
       <section class="battle-controls" aria-label="行動選択">
@@ -549,12 +615,12 @@ function renderCombat(c){
     </div>
   </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
-  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${weaponPower(c)} ダメージ / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p><p>使用するとターン終了。</p><p class="muted">${c.weapon.basePower} × (1 + √${weaponStatKey(c.weapon)} × 0.12)</p>`,()=>useWeapon(c));
+  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${weaponPower(c)} ダメージ / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p><p>使用するとターン終了。</p><p class="muted">${getEffectiveBasePower(c.weapon)} × (1 + √${weaponStatKey(c.weapon)} × 0.12)</p>`,()=>useWeapon(c));
   document.querySelectorAll("[data-memory]").forEach(button=>{
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${getEffectiveMaxHp(c)} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
   bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${intent.damage?`${intent.damage} ダメージ`:"防御態勢"}</p>`,()=>{});
   scheduleCombatResolution(c);
 }
@@ -563,13 +629,13 @@ function renderMemory(c,m,i,readOnly=false){
   return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="${memoryIcon(m)}" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
 function memoryEffectText(c,m){
-  const d=getMemDef(m),val=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
+  const d=getMemDef(m),val=calcScaled(getEffectiveBasePower(m),getEffectiveStats(c)[d.main]);
   return d.category==="回復"?`HPを ${val} 回復`:d.category==="防御"?`防壁 ${val} を得る`:`敵に ${val} ダメージ / 命中 ${d.hit}%`;
 }
 function memoryDescription(c,m){
   const d=getMemDef(m),effect=memoryEffectText(c,m);
 
-  return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
+  return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}${getEffectiveBasePower(m)!==d.basePower?`<br>BASE POWER ${basePowerDescription(m)}`:""}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
 }
 // A held or cancelled gesture never activates an action on release.
 // aria-disabled keeps cooling/broken memories inspectable while guarding execution.
@@ -639,14 +705,14 @@ function useMemory(c,index){
   }
 
   if(resolved){
-    const value=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
+    const value=calcScaled(getEffectiveBasePower(inst),getEffectiveStats(c)[d.main]);
     if(d.category==="攻撃"){
       if(rollHit(d.hit)){
         const dealt=applyEnemyDamage(value);
         logMsg(`${d.name}: ${dealt} damage`,"good");
       }else logMsg(`${d.name}: MISS`,"bad");
     }else if(d.category==="回復"){
-      const before=c.hp;c.hp=clamp(c.hp+value,0,c.maxHp);
+      const before=c.hp;c.hp=clamp(c.hp+value,0,getEffectiveMaxHp(c));
       logMsg(`${d.name}: HP +${c.hp-before}`,"good");
     }else if(d.category==="防御"){
       state.run.shield+=value;
@@ -698,8 +764,9 @@ function checkVictory(c){
   if(e.hp>0) return false;
   logMsg(`${e.name} 排除。`,"good");
   c.wins++;c.depth=Math.max(c.depth,state.run.depth+1);
+  const defeatedDepth=state.run.depth;
   state.run.depth++;
-  state.run.loot=generateLoot(e);state.run.phase="loot";
+  state.run.loot=generateLoot(e,Math.random,defeatedDepth);state.run.phase="loot";
   state.run.combat=null;
   save();render();
   return true;
@@ -749,11 +816,11 @@ function renderDeath(c){
 }
 
 function moduleEffects(m){
-  return (getModuleDef(m)?.effects||[]).map(e=>`<span class="modifier ${e.value<0?"negative":"positive"}">${esc(e.stat)} ${e.value>=0?"+":""}${e.value}${e.mode==="percent"?"%":""}</span>`).join(" · ");
+  return getModuleEffects(m).map(e=>`<span class="modifier ${e.value<0?"negative":"positive"}">${esc({MAX_HP:"MAX HP",BASE_POWER:"BASE POWER"}[e.target||e.stat]||e.target||e.stat)} ${e.value>=0?"+":""}${e.value}${e.mode==="percent"?"%":""}</span>`).join("");
 }
 function itemName(item){return item.name||getMemDef(item)?.name||"未設定";}
-function moduleSummary(m){const d=getModuleDef(m);return `<b>${esc(d?.name||m.definitionId||"旧モジュール")}</b><small>${esc(d?.rarity||"未設定")}</small><div>${moduleEffects(m)}</div>`;}
-function equipmentSummary(item){return `<b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · MODULE ${item.modules.length}/${item.moduleSlots}</small>${item.modules.map(m=>`<div class="installed-module">${moduleSummary(m)}</div>`).join("")}`;}
+function moduleSummary(m){const d=getModuleDef(m);return `<b>${esc(d?.name||m.definitionId||"旧モジュール")}</b><small>${esc(m.rarity||d?.rarity||"未設定")} · 取得深度 ${m.generatedDepth??"未記録"}</small><div class="module-effect-lines">${moduleEffects(m)}</div>`;}
+function equipmentSummary(item){return `<b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · MODULE ${item.modules.length}/${item.moduleSlots}</small>${item.modules.map((m,i)=>`<div class="installed-module"><small>SLOT ${(m.slotIndex??i)+1}</small>${moduleSummary(m)}</div>`).join("")}`;}
 function renderLoot(c){
   const loot=state.run.loot;
   if(!loot)return;
@@ -788,28 +855,42 @@ function equipmentDialog(className,title,onClose=()=>{}){
   };
   return {overlay,body:overlay.querySelector(".equipment-dialog-body"),close};
 }
-function openModuleInstall(c,moduleId,{targetId=null,onDone=renderInventory}={}){
+function openModuleInstall(c,moduleId,{targetId=null,slotIndex=null,onDone=renderInventory}={}){
   if(!canModifyEquipment(c))return;
   const module=c.inventory.modules.find(m=>m.instanceId===moduleId);if(!module||!getModuleDef(module))return;
   const {overlay,body,close}=equipmentDialog("module-install-overlay","インストール先");
-  body.innerHTML=`<div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}" ${item.modules.length>=item.moduleSlots?"disabled":""}>${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div>`;
+  body.innerHTML=`<div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}">${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div>`;
   const cancel=overlay.querySelector(".equipment-dialog-close");cancel.id="cancelInstall";cancel.textContent="CANCEL";
-  function confirmTarget(id){
+  function confirmSlot(id,slot){
     const target=installTargets(c).find(i=>i.instanceId===id);
-    if(!target||target.modules.length>=target.moduleSlots||!canModifyEquipment(c))return;
-    overlay.querySelector("h3").textContent=getModuleDef(module).name;
-    body.innerHTML=`<div>${moduleEffects(module)}</div><p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p><button id="confirmInstall">INSTALL</button>`;
-    body.querySelector("#confirmInstall").onclick=()=>{if(installModule(c,moduleId,id)){close();onDone();}};
-    body.querySelector("#confirmInstall").focus();
+    if(!target||slot<0||slot>=target.moduleSlots||!canModifyEquipment(c))return;
+    const old=moduleAtSlot(target,slot),oldId=old?.instanceId;
+    overlay.querySelector("h3").textContent=old?"OVERWRITE":"INSTALL";
+    body.innerHTML=`${moduleSummary(module)}<p>${esc(itemName(target))} · SLOT ${slot+1}</p>${old?`<p>${esc(getModuleDef(old)?.name||old.definitionId)}を上書きします。</p><div class="overwritten-module">${moduleSummary(old)}</div><p class="negative">※上書きされたModuleは消失します。<br>※元に戻すことはできません。</p>`:`<p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p>`}<button id="${old?"confirmOverwrite":"confirmInstall"}">${old?"OVERWRITE":"INSTALL"}</button>`;
+    const confirm=body.querySelector("#confirmInstall,#confirmOverwrite");
+    confirm.onclick=()=>{const done=old?overwriteModule(c,moduleId,id,slot,oldId):installModule(c,moduleId,id,slot);if(done){close();onDone();}};confirm.focus();
   }
-  body.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>confirmTarget(b.dataset.installTarget));
-  if(targetId)confirmTarget(targetId);else overlay.querySelector("button:not(:disabled)").focus();
+  function chooseTarget(id){
+    const target=installTargets(c).find(i=>i.instanceId===id);if(!target)return;
+    const empty=firstEmptyModuleSlot(target);
+    if(slotIndex!==null){confirmSlot(id,slotIndex);return;}
+    if(empty!==-1){confirmSlot(id,empty);return;}
+    body.innerHTML=`${moduleSummary(module)}<p>上書きするSlotを選択</p><div class="install-targets">${Array.from({length:target.moduleSlots},(_,slot)=>`<button data-overwrite-slot="${slot}">SLOT ${slot+1} · ${esc(getModuleDef(moduleAtSlot(target,slot))?.name||"装着Module")}</button>`).join("")}</div>`;
+    body.querySelectorAll("[data-overwrite-slot]").forEach(b=>b.onclick=()=>confirmSlot(id,+b.dataset.overwriteSlot));body.querySelector("button").focus();
+  }
+  body.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>chooseTarget(b.dataset.installTarget));
+  if(targetId)chooseTarget(targetId);else overlay.querySelector("button:not(:disabled)").focus();
 }
 function equipmentList(c){
-  return `<h3>EQUIPPED</h3><button class="inventory-item equipment-choice" data-equipment="${esc(c.weapon.instanceId)}"><small>WEAPON</small>${equipmentSummary(c.weapon)}<small>${esc(c.weapon.weaponType)} · POWER ${c.weapon.basePower} · MAIN ${weaponStatKey(c.weapon)} · HIT ${c.weapon.hit}% · ${c.weapon.hitCount||1} HIT</small></button>${c.memories.map((m,i)=>`<button class="inventory-item equipment-choice" data-equipment="${esc(m.instanceId)}"><small>MEMORY 0${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT}/${getMemDef(m).ct} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></button>`).join("")}`;
+  return `<h3>EQUIPPED</h3><button class="inventory-item equipment-choice" data-equipment="${esc(c.weapon.instanceId)}"><small>WEAPON</small>${equipmentSummary(c.weapon)}<small>${esc(c.weapon.weaponType)} · BASE POWER ${basePowerDescription(c.weapon)} · MAIN ${weaponStatKey(c.weapon)} · HIT ${c.weapon.hit}% · ${c.weapon.hitCount||1} HIT</small></button>${c.memories.map((m,i)=>`<button class="inventory-item equipment-choice" data-equipment="${esc(m.instanceId)}"><small>MEMORY 0${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT}/${getMemDef(m).ct} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></button>`).join("")}`;
 }
 function moduleSlotControls(item,locked){
-  return `<p>MODULE ${item.modules.length} / ${item.moduleSlots}</p><div class="module-slot-grid" style="--slot-count:${item.moduleSlots}">${Array.from({length:item.moduleSlots},(_,i)=>item.modules[i]?`<span class="module-slot occupied" aria-label="${esc(getModuleDef(item.modules[i])?.name||"装着済みモジュール")}">■</span>`:`<button class="module-slot" data-empty-module-slot="${i}" aria-label="空きモジュールスロット${i+1}" ${locked?"disabled":""}>□</button>`).join("")}</div><div>${item.modules.map(m=>`<div class="installed-module">${moduleSummary(m)}</div>`).join("")||"装着モジュールなし。"}</div>`;
+  return `<p>MODULE ${item.modules.length} / ${item.moduleSlots}</p><div class="module-slot-grid" style="--slot-count:${item.moduleSlots}">${Array.from({length:item.moduleSlots},(_,slot)=>{
+    const m=moduleAtSlot(item,slot);
+    return m?`<button class="module-slot occupied" data-module-slot="${slot}" aria-label="SLOT ${slot+1} ${esc(getModuleDef(m)?.name||"装着Module")}、詳細">■</button>`:`<button class="module-slot" data-empty-module-slot="${slot}" aria-label="空きモジュールスロット${slot+1}" ${locked?"disabled":""}>□</button>`;
+  }).join("")}</div><div class="module-slot-list">${Array.from({length:item.moduleSlots},(_,slot)=>{
+    const m=moduleAtSlot(item,slot);return `<div class="installed-module"><small>SLOT ${slot+1}</small>${m?moduleSummary(m):"EMPTY"}</div>`;
+  }).join("")}</div>`;
 }
 function openCharacterEquipment(c,initialItemId=null){
   const combatView=!canModifyEquipment(c),{overlay,body,close}=equipmentDialog("character-overlay","CHARACTER / EQUIPMENT",()=>{if(state.screen==="inventory"){renderInventory();(el.querySelector(`[data-equipment="${initialItemId}"]`)||el.querySelector("[data-inventory-tab]"))?.focus();}else if(state.screen==="run"){render();el.querySelector("#playerDetails")?.focus();}});
@@ -819,21 +900,29 @@ function openCharacterEquipment(c,initialItemId=null){
     const item=currentId?installTargets(c).find(i=>i.instanceId===currentId):null;
     if(!item){
       currentId=null;
-      body.innerHTML=`<div class="character-summary"><b>${esc(c.name)}</b><small>${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}</small><p>HP ${c.hp} / ${c.maxHp}</p><p>${statsDescription(c)}</p>${locked()?`<p class="negative">戦闘中は詳細確認のみ可能です。</p>`:""}</div>${equipmentList(c)}`;
+      body.innerHTML=`<div class="character-summary"><b>${esc(c.name)}</b><small>${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}</small><p>HP ${c.hp} / ${getEffectiveMaxHp(c)}</p><p>${statsDescription(c)}</p>${locked()?`<p class="negative">戦闘中は詳細確認のみ可能です。</p>`:""}</div>${equipmentList(c)}`;
       body.querySelectorAll("[data-equipment]").forEach(b=>b.onclick=()=>{currentId=b.dataset.equipment;paint();});
     }else{
       const memory=item!==c.weapon,d=memory?getMemDef(item):null,index=c.memories.indexOf(item);
-      body.innerHTML=`<button id="equipmentOverview">‹ CHARACTER</button><h4>${esc(itemName(item))}</h4><p>${esc(item.rarity)}${memory?` · ${esc(d.category)} · ${d.execution==="STANDARD"?"標準実行":"即時実行"} (${d.execution})`:` · ${esc(item.weaponType)}`}</p><p>POWER ${memory?d.basePower:item.basePower} · MAIN ${memory?d.main:weaponStatKey(item)}<br>HIT ${memory?d.hit:item.hit}%${memory?"":` · HIT COUNT ${item.hitCount||1}`}</p>${memory?`<p>CT ${item.currentCT} / ${d.ct}<br>破損率 ${item.breakageRate.toFixed(2)}% · ${item.broken?"BROKEN":"ACTIVE"}</p><p>${esc(d.description)}</p><div class="equipment-effect">現在の効果：${memoryEffectText(c,item)}</div>`:`<p>現在の威力 ${weaponPower(c)}</p>`}${moduleSlotControls(item,locked())}${memory&&index>=0?`<button id="changeMemory" ${locked()?"disabled":""}>CHANGE</button>`:""}${locked()?`<p class="negative">戦闘中は変更・インストールできません。</p>`:""}`;
+      body.innerHTML=`<button id="equipmentOverview">‹ CHARACTER</button><h4>${esc(itemName(item))}</h4><p>${esc(item.rarity)}${memory?` · ${esc(d.category)} · ${d.execution==="STANDARD"?"標準実行":"即時実行"} (${d.execution})`:` · ${esc(item.weaponType)}`}</p><p>BASE POWER ${basePowerDescription(item)} · MAIN ${memory?d.main:weaponStatKey(item)}<br>HIT ${memory?d.hit:item.hit}%${memory?"":` · HIT COUNT ${item.hitCount||1}`}</p>${memory?`<p>CT ${item.currentCT} / ${d.ct}<br>破損率 ${item.breakageRate.toFixed(2)}% · ${item.broken?"BROKEN":"ACTIVE"}</p><p>${esc(d.description)}</p><div class="equipment-effect">現在の効果：${memoryEffectText(c,item)}</div>`:`<p>現在の威力 ${weaponPower(c)}</p>`}${moduleSlotControls(item,locked())}${memory&&index>=0?`<button id="changeMemory" ${locked()?"disabled":""}>CHANGE</button>`:""}${locked()?`<p class="negative">戦闘中は変更・インストールできません。</p>`:""}`;
       body.querySelector("#equipmentOverview").onclick=()=>{currentId=null;paint();};
-      body.querySelectorAll("[data-empty-module-slot]").forEach(b=>b.onclick=()=>{if(!locked())openUnusedModules(item);});
+      body.querySelectorAll("[data-empty-module-slot]").forEach(b=>b.onclick=()=>{if(!locked())openUnusedModules(item,+b.dataset.emptyModuleSlot);});
+      body.querySelectorAll("[data-module-slot]").forEach(b=>b.onclick=()=>openInstalledModule(item,+b.dataset.moduleSlot));
       const change=body.querySelector("#changeMemory");if(change)change.onclick=()=>{if(!locked())openMemoryChange(index,item.instanceId);};
     }
     body.scrollTop=0;overlay.querySelector("button:not(:disabled)").focus();
   }
-  function openUnusedModules(item){
+  function openUnusedModules(item,slot){
     const dialog=equipmentDialog("module-picker-overlay","未使用MODULE");
     dialog.body.innerHTML=c.inventory.modules.map(m=>`<button data-pick-module="${esc(m.instanceId)}" ${getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}</button>`).join("")||"未使用モジュールなし。";
-    dialog.body.querySelectorAll("[data-pick-module]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickModule;dialog.close();if(!locked())openModuleInstall(c,id,{targetId:item.instanceId,onDone:paint});});
+    dialog.body.querySelectorAll("[data-pick-module]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickModule;dialog.close();if(!locked())openModuleInstall(c,id,{targetId:item.instanceId,slotIndex:slot,onDone:paint});});
+    dialog.overlay.querySelector("button:not(:disabled)").focus();
+  }
+  function openInstalledModule(item,slot){
+    const m=moduleAtSlot(item,slot);if(!m)return;
+    const dialog=equipmentDialog("installed-module-overlay",`SLOT ${slot+1} · DETAIL`);
+    dialog.body.innerHTML=`${moduleSummary(m)}<button id="overwriteInstalledModule" ${locked()?"disabled":""}>OVERWRITE</button>${locked()?`<p class="negative">戦闘中は上書きできません。</p>`:""}`;
+    dialog.body.querySelector("#overwriteInstalledModule").onclick=()=>{if(!locked()){dialog.close();openUnusedModules(item,slot);}};
     dialog.overlay.querySelector("button:not(:disabled)").focus();
   }
   function openMemoryChange(index,equippedId){

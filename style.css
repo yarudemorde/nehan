@@ -290,3 +290,8 @@ body:has(#app[data-screen="create"]){background:#000}
 .module-slot-grid{display:grid;grid-template-columns:repeat(var(--slot-count),minmax(0,1fr));gap:6px}.module-slot-grid .module-slot{min-width:44px;min-height:44px;display:grid;place-items:center;border:1px solid #777;background:#100a0b;color:#ddd;font-size:23px;padding:4px}.module-slot-grid .occupied{color:#cfadb1;background:#1a1012}.equipment-effect{font-size:12px;line-height:1.6;color:#d1c7c9}.equipment-effect>p{margin-top:6px}
 .module-picker-overlay button,.memory-change-overlay button{text-align:left;line-height:1.6}.memory-change-overlay .installed-module,.module-picker-overlay small{margin-top:5px}
 .install-overlay .install-targets{overflow:visible;display:grid;gap:8px}.install-overlay :is(button,select):focus-visible{outline:2px solid #a65e66;outline-offset:-3px}
+
+/* Instance effects are one line each, and installed slots retain their position. */
+.module-effect-lines{display:grid;gap:3px}.module-effect-lines .modifier{display:block;white-space:normal}
+.module-slot-list{display:grid;gap:6px}.module-slot-list .installed-module{padding:8px 0;margin:0}.overwritten-module{border-left:2px solid #98535e;padding-left:10px;opacity:.8}
+.installed-module-overlay{font-size:13px}.module-slot-grid button.occupied:focus-visible{outline:2px solid #a65e66}
