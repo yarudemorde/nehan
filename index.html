@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.8">
+<link rel="stylesheet" href="style.css?v=0.9">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -59,9 +59,9 @@ const JOBS = [
     ability:{id:"WEAPON_MASTERY",name:"武器習熟",description:"すべての武器種を装備できる。"}}
 ];
 const WEAPONS = [
-  {id:"W001",name:"鉄管ブレード",weaponType:"BLADE",basePower:9,mainStat:"STR",hit:90,hitCount:1,rarity:null}
+  {id:"W001",name:"鉄管ブレード",weaponType:"BLADE",basePower:9,mainStat:"STR",hit:90,hitCount:1,rarity:"COMMON"}
 ];
-// TODO(要確認): 武器種の正式分類・武器レアリティ・追加武器の確定性能。
+// TODO(要確認): 武器種の正式分類・追加武器の確定性能。
 // TODO(要確認): 多段武器の個別命中判定・ダメージ処理。現在の選択候補は1 HITのみ。
 function canEquipWeapon(job,weapon){
   if(!job||!weapon)return false;
@@ -70,13 +70,66 @@ function canEquipWeapon(job,weapon){
 }
 function weaponTypeLabel(type){return {BLADE:"刃物",LEGACY:"未設定"}[type]||type;}
 function weaponStatKey(weapon){return weapon.mainStat||"STR";}
-function weaponPower(c){return calcScaled(c.weapon.basePower,c.stats[weaponStatKey(c.weapon)]);}
+function weaponPower(c){return calcScaled(c.weapon.basePower,getEffectiveStats(c)[weaponStatKey(c.weapon)]);}
 
 const ENEMIES = [
-  {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,pattern:["ATTACK","ATTACK","GUARD"]},
-  {id:"E02",name:"違法義体狩り",baseHp:39,atk:8,pattern:["ATTACK","HEAVY","ATTACK"]},
-  {id:"E03",name:"逆接僧兵",baseHp:48,atk:9,pattern:["GUARD","HEAVY","ATTACK"]}
+  {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,memoryPool:["M002","M004"],pattern:["ATTACK","ATTACK","GUARD"]},
+  {id:"E02",name:"違法義体狩り",baseHp:39,atk:8,memoryPool:["M001","M002"],pattern:["ATTACK","HEAVY","ATTACK"]},
+  {id:"E03",name:"逆接僧兵",baseHp:48,atk:9,memoryPool:["M003","M004"],pattern:["GUARD","HEAVY","ATTACK"]}
 ];
+
+// Definitions never contain installed or player-owned state.
+const MODULES = [
+  {id:"MOD001",name:"筋力増幅回路",rarity:"COMMON",effects:[{stat:"STR",mode:"percent",value:10},{stat:"DEX",mode:"flat",value:-5}]},
+  {id:"MOD002",name:"違法筋繊維",rarity:"COMMON",effects:[{stat:"STR",mode:"flat",value:5},{stat:"DEX",mode:"percent",value:-5}]}
+];
+const RARITY_SLOTS={COMMON:0,UNCOMMON:1,RARE:2,EPIC:3,LEGENDARY:4};
+function canonicalRarity(value){return {コモン:"COMMON",アンコモン:"UNCOMMON",レア:"RARE",エピック:"EPIC",レジェンダリー:"LEGENDARY"}[value]||(Object.hasOwn(RARITY_SLOTS,value)?value:"COMMON");}
+function itemId(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+function normalizeItem(item,rarity){
+  item.instanceId??=itemId();item.rarity=canonicalRarity(item.rarity||rarity);
+  item.moduleSlots=RARITY_SLOTS[item.rarity];item.modules??=[];
+  item.modules.forEach(m=>{m.instanceId??=itemId();m.definitionId??=m.id;});
+  return item;
+}
+function createMemoryInstance(definitionId){
+  const d=MEMORIES.find(x=>x.id===definitionId);
+  return normalizeItem({definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]},d.rarity);
+}
+function createModuleInstance(definitionId){return {instanceId:itemId(),definitionId};}
+function getModuleDef(instance){return MODULES.find(m=>m.id===instance.definitionId);}
+function getEffectiveStats(c){
+  const flat={},percent={};
+  [c.weapon,...c.memories].filter(Boolean).forEach(item=>(item.modules||[]).forEach(m=>{
+    (getModuleDef(m)?.effects||[]).forEach(e=>{
+      if(!["VIT","STR","DEX","INT"].includes(e.stat)||!Number.isFinite(e.value))return;
+      const totals=e.mode==="flat"?flat:e.mode==="percent"?percent:null;
+      if(totals)totals[e.stat]=(totals[e.stat]||0)+e.value;
+    });
+  }));
+  return Object.fromEntries(Object.entries(c.stats).map(([k,v])=>[k,Math.max(0,Math.round((v+(flat[k]||0))*(1+(percent[k]||0)/100)))]));
+}
+function statsDescription(c){const effective=getEffectiveStats(c);return Object.entries(c.stats).map(([k,v])=>`${k} ${v}${effective[k]!==v?` → ${effective[k]}`:""}`).join(" / ");}
+function generateLoot(enemy,rng=Math.random){
+  const definition=ENEMIES.find(e=>e.id===enemy.id)||enemy;
+  const pool=(definition.memoryPool||[]).filter(id=>MEMORIES.some(m=>m.id===id));
+  if(rng()<.2&&pool.length)return {type:"MEMORY",item:createMemoryInstance(pool[Math.floor(rng()*pool.length)])};
+  const modulePool=definition.modulePool?MODULES.filter(m=>definition.modulePool.includes(m.id)):MODULES;
+  const candidates=modulePool.length?modulePool:MODULES;
+  return {type:"MODULE",item:createModuleInstance(candidates[Math.floor(rng()*candidates.length)].id)};
+}
+function installTargets(c){return [c.weapon,...c.memories,...c.inventory.memories].filter(Boolean);}
+function installModule(c,moduleId,targetId){
+  // Resolve again at commit time: stale confirmations cannot consume an instance twice.
+  const index=c.inventory.modules.findIndex(m=>m.instanceId===moduleId),target=installTargets(c).find(i=>i.instanceId===targetId);
+  if(index<0||!target||target.modules.length>=target.moduleSlots||!getModuleDef(c.inventory.modules[index]))return false;
+  target.modules.push(c.inventory.modules.splice(index,1)[0]);save();return true;
+}
+function collectLoot(c){
+  if(state.run?.ownerId!==c.id||state.run.phase!=="loot"||!state.run.loot)return false;
+  const loot=state.run.loot;c.inventory[loot.type==="MEMORY"?"memories":"modules"].push(loot.item);
+  state.run.loot=null;state.run.phase="map";state.run.routes=makeRoutes(state.run.depth);save();render();return true;
+}
 
 const STORAGE_KEY = "nehan_alpha_v1";
 const el = document.querySelector("#app");
@@ -102,9 +155,12 @@ function normalizeState(saved){
     if(!c)return;
     // Preserve every legacy stat, HP value, Memory state and installed Module.
     c.jobId??="LEGACY";
+    c.inventory??={memories:[],modules:[]};c.inventory.memories??=[];c.inventory.modules??=[];
+    [...c.memories,...c.inventory.memories].forEach(m=>normalizeItem(m,getMemDef(m)?.rarity));
+    c.inventory.modules.forEach(m=>{m.instanceId??=itemId();m.definitionId??=m.id;});
     if(c.weapon){
       c.weapon.mainStat??="STR";c.weapon.hitCount??=1;
-      c.weapon.weaponType??="LEGACY";c.weapon.rarity??=null;
+      c.weapon.weaponType??="LEGACY";normalizeItem(c.weapon,"COMMON");
     }
   });
   saved.createDraft??=null;
@@ -126,8 +182,8 @@ function createCharacter(draft){
   return {
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
     name:creationName(draft.name),jobId:job.id,stats:{...job.stats},maxHp:42,hp:42,
-    weapon:{...weapon},
-    memories:draft.memoryIds.map(definitionId=>({definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]})),
+    weapon:normalizeItem({...weapon,modules:[]},weapon.rarity),
+    memories:draft.memoryIds.map(createMemoryInstance),inventory:{memories:[],modules:[]},
     depth:0,wins:0,createdAt:Date.now()
   };
 }
@@ -352,6 +408,7 @@ function renderRun(){
   if(!c){state.screen="play";save();return render();}
   if(!state.run || state.run.ownerId!==c.id){state.run=newRun(c);state.run.ownerId=c.id;}
   if(state.run.phase==="combat") return renderCombat(c);
+  if(state.run.phase==="loot") return renderLoot(c);
   if(state.run.phase==="dead") return renderDeath(c);
   return renderMap(c);
 }
@@ -412,7 +469,7 @@ function renderMap(c){
     bindActionHold(button,()=>`<b>次の候補</b><p>戦闘</p>`,()=>{});
   });
   bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>`戦闘 → ${r.future.map(()=>"戦闘").join(" / ")}`).join("<br>")}</p>`,()=>{});
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
   bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${weaponPower(c)} / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p>`,()=>{});
   document.querySelectorAll("[data-memory]").forEach(button=>{
     bindActionHold(button,()=>memoryDescription(c,c.memories[+button.dataset.memory]),()=>{});
@@ -485,7 +542,7 @@ function renderCombat(c){
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
   bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${intent.damage?`${intent.damage} ダメージ`:"防御態勢"}</p>`,()=>{});
   scheduleCombatResolution(c);
 }
@@ -494,7 +551,7 @@ function renderMemory(c,m,i,readOnly=false){
   return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="${memoryIcon(m)}" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
 function memoryDescription(c,m){
-  const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
+  const d=getMemDef(m), val=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
   const effect=d.category==="回復"?`HPを ${val} 回復`:d.category==="防御"?`防壁 ${val} を得る`:`敵に ${val} ダメージ / 命中 ${d.hit}%`;
   return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
 }
@@ -566,7 +623,7 @@ function useMemory(c,index){
   }
 
   if(resolved){
-    const value=calcScaled(d.basePower,c.stats[d.main]);
+    const value=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
     if(d.category==="攻撃"){
       if(rollHit(d.hit)){
         const dealt=applyEnemyDamage(value);
@@ -620,16 +677,15 @@ function scheduleCombatResolution(c){
 }
 
 function checkVictory(c){
+  if(state.run?.phase!=="combat")return false;
   const e=state.run.combat.enemy;
   if(e.hp>0) return false;
   logMsg(`${e.name} 排除。`,"good");
   c.wins++;c.depth=Math.max(c.depth,state.run.depth+1);
   state.run.depth++;
-  state.run.phase="map";
+  state.run.loot=generateLoot(e);state.run.phase="loot";
   state.run.combat=null;
-  state.run.routes=makeRoutes(state.run.depth);
-  save();
-  showResult("NODE CLEAR",`深度 ${state.run.depth} へ進行した。`,()=>render());
+  save();render();
   return true;
 }
 
@@ -676,14 +732,49 @@ function renderDeath(c){
   };
 }
 
+function moduleEffects(m){
+  return (getModuleDef(m)?.effects||[]).map(e=>`<span class="modifier ${e.value<0?"negative":"positive"}">${esc(e.stat)} ${e.value>=0?"+":""}${e.value}${e.mode==="percent"?"%":""}</span>`).join(" · ");
+}
+function itemName(item){return item.name||getMemDef(item)?.name||"未設定";}
+function moduleSummary(m){const d=getModuleDef(m);return `<b>${esc(d?.name||m.definitionId||"旧モジュール")}</b><small>${esc(d?.rarity||"未設定")}</small><div>${moduleEffects(m)}</div>`;}
+function equipmentSummary(item){return `<b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · MODULE ${item.modules.length}/${item.moduleSlots}</small>${item.modules.map(m=>`<div class="installed-module">${moduleSummary(m)}</div>`).join("")}`;}
+function renderLoot(c){
+  const loot=state.run.loot;
+  if(!loot)return;
+  el.innerHTML=`<section class="loot-screen"><p class="kicker">RECOVERED ${loot.type}</p><div class="loot-item" role="status">${loot.type==="MEMORY"?`${equipmentSummary(loot.item)}<p>MODULE SLOT ${loot.item.moduleSlots}</p>`:moduleSummary(loot.item)}</div><button class="btn" id="collectLoot">回収</button></section>`;
+  el.querySelector("#collectLoot").onclick=()=>collectLoot(c);
+}
+let inventoryCharacterId=null,inventoryTab="equipped";
 function renderInventory(){
-  const owned=state.slots.filter(Boolean);
-  el.innerHTML=top()+`
-  <section class="panel"><div class="kicker">INVENTORY</div><h2>MEMORY / MODULE</h2>
-  <p class="small muted">α版では生存中キャラクターに装備されたメモリ状態のみ確認できます。</p></section>
-  ${owned.length?owned.map(c=>`<section class="panel inventory-panel"><h3>${esc(c.name)}</h3>${c.memories.map(m=>{const d=getMemDef(m);return `<div class="small" style="padding:7px 0;border-top:1px solid var(--line)">${esc(d.name)} / 破損率 ${m.breakageRate.toFixed(2)}% / ${m.broken?"BROKEN":"ACTIVE"}</div>`}).join("")}</section>`).join(""):`<section class="panel muted">保有データなし。</section>`}
-  <button class="btn ghost" data-nav="home">← HOME</button>`+footer();
+  const owned=state.slots.filter(Boolean),c=owned.find(c=>c.id===inventoryCharacterId)||owned[0];inventoryCharacterId=c?.id;
+  el.innerHTML=`<section class="inventory-heading"><h2>INVENTORY</h2>${c?`<select id="inventoryCharacter" aria-label="キャラクター">${owned.map(x=>`<option value="${esc(x.id)}" ${x===c?"selected":""}>${esc(x.name)}</option>`).join("")}</select><p class="small">${statsDescription(c)}</p><div class="inventory-tabs">${[["equipped","EQUIPPED"],["memories","MEMORIES"],["modules","MODULES"]].map(([id,label])=>`<button data-inventory-tab="${id}" aria-pressed="${inventoryTab===id}">${label}</button>`).join("")}</div>`:""}</section><section class="inventory-list inventory-panel">${!c?"保有データなし。":inventoryTab==="equipped"?`<h3>EQUIPPED</h3><article class="inventory-item"><small>WEAPON</small>${equipmentSummary(c.weapon)}</article>${c.memories.map((m,i)=>`<article class="inventory-item"><small>MEMORY ${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></article>`).join("")}`:inventoryTab==="memories"?`<h3>STORAGE / MEMORIES</h3>${c.inventory.memories.map(m=>`<article class="inventory-item">${equipmentSummary(m)}</article>`).join("")||"所持メモリなし。"}`:`<h3>STORAGE / MODULES</h3>${c.inventory.modules.map(m=>`<button class="inventory-item module-choice" data-install-module="${esc(m.instanceId)}" ${getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}<small>インストール先を選択 ›</small></button>`).join("")||"未使用モジュールなし。"}`}</section><button class="btn ghost" data-nav="home">← HOME</button>`;
   bindNav();
+  el.querySelectorAll("[data-inventory-tab]").forEach(b=>b.onclick=()=>{inventoryTab=b.dataset.inventoryTab;renderInventory();});
+  const selector=el.querySelector("#inventoryCharacter");if(selector)selector.onchange=()=>{inventoryCharacterId=selector.value;renderInventory();};
+  el.querySelectorAll("[data-install-module]").forEach(b=>b.onclick=()=>openModuleInstall(c,b.dataset.installModule));
+}
+function openModuleInstall(c,moduleId){
+  const module=c.inventory.modules.find(m=>m.instanceId===moduleId);if(!module)return;
+  const overlay=document.createElement("div");overlay.className="install-overlay";
+  overlay.innerHTML=`<section class="install-card" role="dialog" aria-modal="true" aria-labelledby="installTitle"><h3 id="installTitle">インストール先</h3><div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}" ${item.modules.length>=item.moduleSlots?"disabled":""}>${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div><button id="cancelInstall">CANCEL</button></section>`;
+  el.inert=true;document.body.appendChild(overlay);
+  const close=()=>{overlay.remove();el.inert=false;el.querySelector(`[data-install-module="${moduleId}"]`)?.focus();};
+  overlay.querySelector("#cancelInstall").onclick=close;
+  overlay.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>{
+    const targetId=b.dataset.installTarget,target=installTargets(c).find(i=>i.instanceId===targetId);
+    overlay.querySelector(".install-card").innerHTML=`<h3 id="installTitle">${esc(getModuleDef(module).name)}</h3><div>${moduleEffects(module)}</div><p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p><div class="install-actions"><button id="confirmInstall">INSTALL</button><button id="cancelInstall">CANCEL</button></div>`;
+    overlay.querySelector("#cancelInstall").onclick=close;
+    overlay.querySelector("#confirmInstall").onclick=()=>{if(installModule(c,moduleId,targetId)){close();renderInventory();}};
+    overlay.querySelector("#confirmInstall").focus();
+  });
+  overlay.onkeydown=e=>{
+    if(e.key==="Escape"){e.preventDefault();close();}
+    if(e.key==="Tab"){
+      const nodes=[...overlay.querySelectorAll("button:not(:disabled)")],first=nodes[0],last=nodes.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  };overlay.querySelector("button:not(:disabled)").focus();
 }
 
 function renderPlaceholder(name){

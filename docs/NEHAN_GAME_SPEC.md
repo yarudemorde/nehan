@@ -203,11 +203,11 @@ A single garage screen contains four equal selection rows: **名前 / 職業 / �
 - A `createDraft` stores the selected values for its empty slot. Editing and returning to PLAY retain that draft; they do not create a CharacterState in `slots`.
 - Only the lower-right creation button validates and commits the character, then starts `newRun()` and opens MAP. The button is disabled until the selected occupation, compatible weapon and four distinct valid Memory IDs are present.
 - Initial Memory definitions are M001 破砕, M002 速断, M003 応急修復, M004 防壁展開. They default to all four selected. Selecting a Memory already in another slot swaps the two positions without creating duplicates.
-- Each selected Memory generates an independent `{definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]}` instance. Static definitions never store those mutable fields.
+- Each selected Memory generates an independent `{definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]}` instance. Static definitions never store those mutable fields. Each instance also has a unique `instanceId`, canonical rarity, and rarity-based `moduleSlots`.
 - Current duplicate policy: duplicates are prohibited. The final duplicate-equipment rule remains **UNRESOLVED** (`TODO(要確認)`).
 - New CharacterState stores `jobId`, a copy of the occupation's `stats`, and independent `weapon` / `memories` instances. Existing `c.stats`, `c.weapon`, `c.memories` access remains compatible with MAP, Combat and Inventory.
 - **Current implementation HP remains 42/42.** A derived VIT-to-HP formula is **UNRESOLVED**; do not invent one.
-- WeaponDefinition is separate from character creation and carries `id`, `name`, `weaponType`, `basePower`, `mainStat`, `hit`, `hitCount`, `rarity`. The current selectable catalog uses the existing 鉄管ブレード (W001, base power 9, hit 90%, STR, 1 HIT). Its `BLADE` type is an implementation category, not a finalized taxonomy. Its rarity is unset. The example 打刀 does not establish a new production weapon.
+- WeaponDefinition is separate from character creation and carries `id`, `name`, `weaponType`, `basePower`, `mainStat`, `hit`, `hitCount`, `rarity`. The current selectable catalog uses the existing 鉄管ブレード (W001, base power 9, hit 90%, STR, 1 HIT). Its `BLADE` type is an implementation category, not a finalized taxonomy. Its rarity is COMMON (0 Module slots). The example 打刀 does not establish a new production weapon.
 - Weapon scaling reads `weapon.mainStat` (fallback STR) through the existing `calcScaled()` formula. Current selectable weapons use one hit; per-hit multi-hit resolution remains **UNRESOLVED**.
 - The draft and completed characters use the existing `nehan_alpha_v1` storage key. Legacy characters preserve HP, stats, weapon performance, Memory CT/breakage/broken state and installed Modules. Missing `jobId` becomes LEGACY (職業未設定), missing weapon `mainStat` becomes STR, `hitCount` becomes 1, and `weaponType` becomes LEGACY. Do not clear storage or replace legacy stats with the new occupation stats.
 - Mobile screen has no page scrolling, respects safe areas and 44px minimum action targets. The name editor fits the existing visualViewport handling while the software keyboard is shown.
@@ -536,14 +536,11 @@ Modules can be installed into/associated with a Memory such that the installed M
 
 When that Memory is recovered after character death, its installed Modules are inherited with it.
 
-## 7.4 Module details — UNRESOLVED
+## 7.4 Module details — PARTIALLY CONFIRMED
+
+Rarity-based slots (0–4), weapon/Memory installation, permanent installation and VIT/STR/DEX/INT flat/percent effects are confirmed in the 2026-10-04 addendum below.
 
 Not yet decided:
-
-- number of Module slots per Memory
-- whether Module slots differ by Memory rarity
-- whether Modules can be freely removed
-- removal cost
 - whether duplicate Modules can be installed
 - Module rarity structure
 - exact stat value ranges
@@ -571,8 +568,8 @@ Do not hard-code assumptions here.
 - whether weapon attacks have CT
 - whether normal attack is formally Standard Execution
 - durability/breakage
-- weapon Modules or modifications
-- weapon rarity
+- additional weapon modifications beyond the confirmed Module system
+- rarity distribution for additional weapons
 
 Keep the weapon action system compatible with the same generic action-resolution pipeline when possible.
 
@@ -1013,3 +1010,20 @@ When implementing future user instructions:
 - keep incomplete decisions as UNRESOLVED
 - do not remove historical TODOs unless the new instruction resolves them
 - if a new request contradicts this document, the newer explicit user instruction wins, but the contradiction should be reflected in the specification immediately
+
+
+## 追加確定仕様：戦利品・所持メモリ・Module — CONFIRMED (2026-10-04)
+
+- 敵撃破ごとに戦利品を1個生成する。MEMORY 20%、MODULE 80%。`combat → loot → map` の順に進み、回収前の戦利品を `state.run.loot` に保存する。リロードでは再抽選せず、回収は1回のみ。
+- 各 EnemyDefinition の `memoryPool` は装備・使用していたメモリ候補。現実装では廃棄ドローン M002/M004、違法義体狩り M001/M002、逆接僧兵 M003/M004。AIの実際のメモリ使用は今回追加しない。
+- Module は `MODULES` から抽選する。将来の敵別 `modulePool` にも対応。レア度の抽選ルールは追加せず、各定義の既存レア度を引き継ぐ。
+- `c.memories` は装備中の4個。未装備メモリは `c.inventory.memories`、未使用Moduleは `c.inventory.modules` に保存する。同じメモリ定義の複数個体を所持でき、`instanceId` で区別する。
+- 武器・メモリ個体は `instanceId / rarity / moduleSlots / modules` を持つ。COMMON=0、UNCOMMON=1、RARE=2、EPIC=3、LEGENDARY=4スロット。初期鉄管ブレードはCOMMON、0スロット。
+- Module個体は `instanceId / definitionId`、静的定義は `id / name / rarity / effects[]`。effects は stat(VIT/STR/DEX/INT)、mode(flat/percent)、valueを保持する。
+- 筋力増幅回路（MOD001、COMMON）：STR +10%、DEX -5。違法筋繊維（MOD002、COMMON）：STR +5、DEX -5%。
+- 武器・装備メモリ・所持メモリへ空きスロットがある場合だけ装着可能。確認後、未使用Moduleの同じ個体を対象へ移動して保存する。取り外し・交換・上書きは不可。
+- `c.stats` は基礎値として変更しない。`getEffectiveStats(c)` は装備武器と装備メモリのModuleだけを集計し、`max(0, round((base + flat合計) × (1 + percent合計 / 100)))` を計算する。未装備アイテムは補正対象外。
+- 例：基礎STR20/DEX20、装備武器に筋力増幅回路、装備破砕に違法筋繊維 → STR28、DEX14。補正値は武器・メモリ威力と長押し詳細へ反映し、HPの算出式は変更しない。
+- INVENTORYはEQUIPPED / STORAGE MEMORIES / STORAGE MODULESを表示し、基礎値→補正値、容量、装着Moduleを確認できる。一覧内部のみスクロールし、下部HOMEと画面全体は固定する。
+- 保存キー `nehan_alpha_v1` を維持する。旧アイテムは欠落していたID・レア度・容量・配列を補完する。既存HP、基礎ステータス、CT、破損状態、装着済みModuleは削除しない。未定義の旧Moduleは表示・保持し、未知の効果を推測して適用しない。
+- メモリの装備交換、死亡後の共通倉庫への回収、倉庫上限、追加レアドロップ分布、HP・命中率・CT・破損率のModule補正は今回未実装・未確定。既存の死亡・戦闘基本仕様を維持する。
