@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.5">
+<link rel="stylesheet" href="style.css?v=0.6">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -62,6 +62,7 @@ const ENEMIES = [
 const STORAGE_KEY = "nehan_alpha_v1";
 const el = document.querySelector("#app");
 let state = load() || freshState();
+const combatResolutionTimers=new WeakMap();
 
 function freshState(){
   return {slots:[null,null,null], activeSlot:null, screen:"home", run:null};
@@ -340,21 +341,22 @@ function chooseEnemyIntent(){
 
 function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
+  const busy=!!combat.pendingAction;
   const enemyArt={E01:"sentinel",E02:"hunter",E03:"monk"}[e.id]||"sentinel";
   el.innerHTML=`
   <section class="battle-scene">
     <div class="battle-heading"><span class="kicker">DEPTH ${state.run.depth} / BATTLE</span><button class="btn ghost small" id="exitRun">HOME</button></div>
-    <div class="enemy-figure"><div class="kicker">${esc(e.name)}</div><img src="assets/${enemyArt}.svg" alt="${esc(e.name)}"></div>
-    <div class="enemy-health"><b>HP ${e.hp} / ${e.maxHp}</b>${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}<div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i></div></div>
+    <div class="enemy-figure"><div class="kicker">${esc(e.name)}</div><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="assets/${enemyArt}.svg" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
+    <div class="enemy-health">${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}<div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i><span class="hp-value">${e.hp}/${e.maxHp}</span></div></div>
     <div class="intent">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
     <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
-    <div class="player-figure"><img src="assets/protagonist.svg" alt="${esc(c.name)}"><span class="kicker">${esc(c.name)}</span></div>
-    <div class="player-health"><b>HP ${c.hp} / ${c.maxHp}</b>${state.run.shield?`<span class="shield">SHIELD ${state.run.shield}</span>`:""}<div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div><div class="battle-stats">${Object.entries(c.stats).map(([k,v])=>`<span>${k} ${v}</span>`).join("")}</div></div>
+    <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}<span class="kicker">${esc(c.name)}</span></div>
+    <div class="player-health">${state.run.shield?`<span class="shield">SHIELD ${state.run.shield}</span>`:""}<div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp}/${c.maxHp}</span></div><div class="battle-stats">${Object.entries(c.stats).map(([k,v])=>`<span>${k} ${v}</span>`).join("")}</div></div>
   </section>
   <section class="battle-controls" aria-label="行動選択">
     <div id="actionDescription" class="action-description hidden" role="tooltip"></div>
     <div class="action-icons">
-      <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-label="武器 ${esc(c.weapon.name)}" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""><span class="action-number">武器</span></button><span class="action-state">標準実行</span><span class="action-wear">破損 ―</span></div>
+      <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-disabled="${busy}" aria-label="武器 ${esc(c.weapon.name)}" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""><span class="action-number">武器</span></button><span class="action-name">${esc(c.weapon.name)}</span><span class="action-wear">破損 ―</span></div>
       ${c.memories.map((m,i)=>renderMemory(c,m,i)).join("")}
     </div>
     <div class="hold-hint">タップ：実行 / 長押し：詳細</div>
@@ -365,10 +367,11 @@ function renderCombat(c){
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
+  scheduleCombatResolution(c);
 }
 
 function renderMemory(c,m,i){
-  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt=""><span class="action-number">${i+1}</span>${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-state">${m.broken?"BROKEN":`CT ${m.currentCT}/${getMemDef(m).ct}`}</span><span class="action-wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>`;
+  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${!!state.run.combat.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt=""><span class="action-number">${i+1}</span>${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span><span class="action-wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>`;
 }
 function memoryDescription(c,m){
   const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
@@ -403,6 +406,7 @@ function applyEnemyDamage(raw){
   let dmg=raw;
   if(e.guard>0){const cut=Math.min(e.guard,dmg);dmg-=cut;e.guard-=cut;}
   e.hp=Math.max(0,e.hp-dmg);
+  state.run.combat.feedback={target:"enemy",value:dmg};
   return dmg;
 }
 function logMsg(text,cls=""){
@@ -412,6 +416,8 @@ function logMsg(text,cls=""){
 }
 
 function useWeapon(c){
+  if(state.run?.phase!=="combat"||state.run.combat.pendingAction)return;
+  delete state.run.combat.feedback;
   if(!rollHit(c.weapon.hit)){
     logMsg(`${c.weapon.name}: MISS`,"bad");
   }else{
@@ -419,14 +425,14 @@ function useWeapon(c){
     const dealt=applyEnemyDamage(raw);
     logMsg(`${c.weapon.name}: ${dealt} damage`,"good");
   }
-  if(checkVictory(c)) return;
-  if(ALPHA.weaponEndsTurn) endPlayerTurn(c);
-  else {save();render();}
+  finishPlayerAction(c,ALPHA.weaponEndsTurn);
 }
 
 function useMemory(c,index){
+  if(state.run?.phase!=="combat"||state.run.combat.pendingAction)return;
   const inst=c.memories[index], d=getMemDef(inst);
   if(inst.currentCT>0 || inst.broken) return;
+  delete state.run.combat.feedback;
 
   // CONFIRMED: 破損判定を先に行う。
   const broke=Math.random()*100 < inst.breakageRate;
@@ -460,9 +466,37 @@ function useMemory(c,index){
   inst.breakageRate=clamp(inst.breakageRate+add,0,100);
   logMsg(`${d.name}: 破損率 +${add.toFixed(2)}% → ${inst.breakageRate.toFixed(2)}%`,"sys");
 
-  if(checkVictory(c)) return;
-  if(d.execution==="STANDARD") endPlayerTurn(c);
-  else { save(); render(); }
+  finishPlayerAction(c,d.execution==="STANDARD");
+}
+
+function damagePopup(combat,target){
+  const f=combat.feedback;
+  return f?.target===target?`<span class="damage-popup" role="status" aria-label="${f.value} ダメージ">${f.value}</span>`:"";
+}
+function finishPlayerAction(c,endsTurn){
+  state.run.combat.pendingAction={stage:"player",endsTurn};
+  save();render();scheduleCombatResolution(c);
+}
+function scheduleCombatResolution(c){
+  const run=state.run, combat=run?.combat;
+  if(!combat?.pendingAction||run.phase!=="combat"||combatResolutionTimers.has(combat))return;
+  combatResolutionTimers.set(combat,setTimeout(()=>{
+    combatResolutionTimers.delete(combat);
+    if(state.run!==run||run.combat!==combat||run.phase!=="combat")return;
+    const pending=combat.pendingAction;
+    if(pending.stage==="player"){
+      if(checkVictory(c))return;
+      delete combat.feedback;
+      if(pending.endsTurn){
+        pending.stage="enemy";
+        endPlayerTurn(c);
+        scheduleCombatResolution(c);
+        return;
+      }
+    }
+    delete combat.pendingAction;delete combat.feedback;
+    save();render();
+  },combat.pendingAction.stage==="player"?750:650));
 }
 
 function checkVictory(c){
@@ -486,6 +520,7 @@ function endPlayerTurn(c){
     const cut=Math.min(state.run.shield,dmg);
     state.run.shield-=cut;dmg-=cut;
     c.hp=Math.max(0,c.hp-dmg);
+    combat.feedback={target:"player",value:dmg};
     logMsg(`${e.name}: ${intent.label} / ${dmg} damage${cut?` (SHIELD ${cut})`:""}`,"bad");
   }else{
     e.guard+=8+state.run.depth;
@@ -493,6 +528,7 @@ function endPlayerTurn(c){
   }
 
   if(c.hp<=0){
+    delete combat.pendingAction;delete combat.feedback;
     state.run.phase="dead";save();return render();
   }
 
@@ -550,6 +586,8 @@ function bindNav(){
 
 state.screen="home";
 render();
+const pendingCharacter=state.slots.find(c=>c?.id===state.run?.ownerId);
+if(pendingCharacter)scheduleCombatResolution(pendingCharacter);
 const splash=document.querySelector("#splash");
 let splashTimer, closed=false;
 function closeSplash(){
