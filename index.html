@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.6">
+<link rel="stylesheet" href="style.css?v=0.7">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -294,25 +294,54 @@ function charHeader(c){
 
 function renderMap(c){
   const routes=state.run.routes;
-  el.innerHTML=top()+charHeader(c)+`
-  <section class="panel map-panel">
-    <div class="kicker">ROUTE FORECAST / 2 STEPS</div>
-    <h2>進路を選択</h2>
-    <p class="small muted">左右どちらかへ進む。各ルートのさらに先、2候補まで予告されます。</p>
-    <div class="grid grid2">
-      ${routes.map(r=>{
-        const e=ENEMIES.find(x=>x.id===r.enemyId);
-        return `<button class="route" data-route="${r.side}">
-          <div class="side">${r.side==="L"?"LEFT":"RIGHT"} ROUTE</div>
-          <div class="enemy">${esc(e.name)}</div>
-          <div class="small muted">戦闘ノード / 深度補正 +${state.run.depth}</div>
-          <div class="future"><span>NEXT // ${esc(r.future[0])}</span><span>NEXT // ${esc(r.future[1])}</span></div>
-        </button>`;
-      }).join("")}
+  const nodeIcon=`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m7 25 18-18 3-3v7L12 27M4 20l8 8M5 27l3-3"/></svg>`;
+  // TODO(要確認): イベント・闇市のルールは未定義。現在の戦闘ルートと予告データを表示する。
+  el.innerHTML=`
+  <section class="battle-viewport map-viewport" aria-label="マップ選択">
+    <div class="battle-canvas map-canvas">
+      <img class="battle-background" src="assets/map-stage.webp" alt="" aria-hidden="true" width="864" height="1536">
+      <div class="enemy-status map-progress">
+        <div class="battle-name">DEPTH ${state.run.depth}</div>
+        <div class="battle-status-note">最深部 ${c.depth} · 踏破 ${c.wins}</div>
+      </div>
+      <button class="enemy-intent map-info" id="mapInfo" aria-label="進路の詳細" aria-describedby="actionDescription"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12"/><path d="M16 14v10M16 8v2"/></svg></button>
+      <button class="battle-menu" id="exitRun" aria-label="ホームへ戻る"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M5 16h22M5 24h22"/></svg></button>
+      <div class="map-nodes" aria-label="進路">
+        ${routes.map((r,i)=>{
+          const e=ENEMIES.find(x=>x.id===r.enemyId);
+          return `<button class="map-node map-choice" data-route="${r.side}" style="--node-x:${i?60.07:24.19}%" aria-label="戦闘：${esc(e.name)}" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span><span class="map-node-name">${esc(e.name)}</span></button>
+            ${r.future.map((name,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" aria-label="次の候補：戦闘、${esc(name)}" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span></button>`).join("")}`;
+        }).join("")}
+      </div>
+      <button class="player-status player-health" id="playerDetails" aria-label="プレイヤーステータス詳細" aria-describedby="actionDescription">
+        <div class="battle-name">${esc(c.name)}</div>
+        <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
+        <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
+      </button>
+      <section class="battle-controls map-equipment" aria-label="装備確認">
+        <div id="actionDescription" class="action-description hidden" role="tooltip"></div>
+        <div class="action-icons">
+          <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-disabled="true" aria-label="武器 ${esc(c.weapon.name)}、詳細" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""></button><span class="action-name">${esc(c.weapon.name)}</span></div>
+          ${c.memories.map((m,i)=>renderMemory(c,m,i,true)).join("")}
+        </div>
+      </section>
     </div>
-  </section>`+footer();
+  </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
-  document.querySelectorAll("[data-route]").forEach(b=>b.onclick=()=>startCombat(b.dataset.route));
+  document.querySelectorAll("[data-route]").forEach(button=>{
+    const r=routes.find(x=>x.side===button.dataset.route),e=ENEMIES.find(x=>x.id===r.enemyId);
+    bindActionHold(button,()=>`<b>戦闘：${esc(e.name)}</b><p>深度 ${state.run.depth}</p><p>次の候補：${r.future.map(esc).join(" / ")}</p>`,()=>startCombat(button.dataset.route));
+  });
+  document.querySelectorAll("[data-preview]").forEach(button=>{
+    const [i,j]=button.dataset.preview.split("-").map(Number);
+    bindActionHold(button,()=>`<b>次の候補</b><p>戦闘：${esc(routes[i].future[j])}</p>`,()=>{});
+  });
+  bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>{const e=ENEMIES.find(x=>x.id===r.enemyId);return `${esc(e.name)} → ${r.future.map(esc).join(" / ")}`}).join("<br>")}</p>`,()=>{});
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${calcScaled(c.weapon.basePower,c.stats.STR)} / 命中 ${c.weapon.hit}%</p>`,()=>{});
+  document.querySelectorAll("[data-memory]").forEach(button=>{
+    bindActionHold(button,()=>memoryDescription(c,c.memories[+button.dataset.memory]),()=>{});
+  });
 }
 
 function startCombat(side){
@@ -386,8 +415,8 @@ function renderCombat(c){
   scheduleCombatResolution(c);
 }
 
-function renderMemory(c,m,i){
-  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${!!state.run.combat.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
+function renderMemory(c,m,i,readOnly=false){
+  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
 function memoryDescription(c,m){
   const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
