@@ -308,9 +308,8 @@ function renderMap(c){
       <button class="battle-menu" id="exitRun" aria-label="ホームへ戻る"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M5 16h22M5 24h22"/></svg></button>
       <div class="map-nodes" aria-label="進路">
         ${routes.map((r,i)=>{
-          const e=ENEMIES.find(x=>x.id===r.enemyId);
-          return `<button class="map-node map-choice" data-route="${r.side}" style="--node-x:${i?60.07:24.19}%" aria-label="戦闘：${esc(e.name)}" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span><span class="map-node-name">${esc(e.name)}</span></button>
-            ${r.future.map((name,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" aria-label="次の候補：戦闘、${esc(name)}" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span></button>`).join("")}`;
+          return `<button class="map-node map-choice" data-route="${r.side}" style="--node-x:${i?60.07:24.19}%" aria-label="戦闘" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span></button>
+            ${r.future.map((_,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" aria-label="次の候補：戦闘" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span></button>`).join("")}`;
         }).join("")}
       </div>
       <button class="player-status player-health" id="playerDetails" aria-label="プレイヤーステータス詳細" aria-describedby="actionDescription">
@@ -329,14 +328,13 @@ function renderMap(c){
   </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
   document.querySelectorAll("[data-route]").forEach(button=>{
-    const r=routes.find(x=>x.side===button.dataset.route),e=ENEMIES.find(x=>x.id===r.enemyId);
-    bindActionHold(button,()=>`<b>戦闘：${esc(e.name)}</b><p>深度 ${state.run.depth}</p><p>次の候補：${r.future.map(esc).join(" / ")}</p>`,()=>startCombat(button.dataset.route));
+    const r=routes.find(x=>x.side===button.dataset.route);
+    bindActionHold(button,()=>`<b>戦闘</b><p>深度 ${state.run.depth}</p><p>次の候補：${r.future.map(()=>"戦闘").join(" / ")}</p>`,()=>startCombat(button.dataset.route));
   });
   document.querySelectorAll("[data-preview]").forEach(button=>{
-    const [i,j]=button.dataset.preview.split("-").map(Number);
-    bindActionHold(button,()=>`<b>次の候補</b><p>戦闘：${esc(routes[i].future[j])}</p>`,()=>{});
+    bindActionHold(button,()=>`<b>次の候補</b><p>戦闘</p>`,()=>{});
   });
-  bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>{const e=ENEMIES.find(x=>x.id===r.enemyId);return `${esc(e.name)} → ${r.future.map(esc).join(" / ")}`}).join("<br>")}</p>`,()=>{});
+  bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>`戦闘 → ${r.future.map(()=>"戦闘").join(" / ")}`).join("<br>")}</p>`,()=>{});
   bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
   bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${calcScaled(c.weapon.basePower,c.stats.STR)} / 命中 ${c.weapon.hit}%</p>`,()=>{});
   document.querySelectorAll("[data-memory]").forEach(button=>{
