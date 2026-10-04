@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.7">
+<link rel="stylesheet" href="style.css?v=0.8">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -53,6 +53,25 @@ const MEMORIES = [
   }
 ];
 
+const JOBS = [
+  {id:"JOB_BOUNTY_HUNTER",name:"賞金稼ぎ",stats:{VIT:6,STR:8,DEX:7,INT:5},
+    primaryStat:"STR",secondaryStat:"DEX",weaponAccess:{type:"ALL"},
+    ability:{id:"WEAPON_MASTERY",name:"武器習熟",description:"すべての武器種を装備できる。"}}
+];
+const WEAPONS = [
+  {id:"W001",name:"鉄管ブレード",weaponType:"BLADE",basePower:9,mainStat:"STR",hit:90,hitCount:1,rarity:null}
+];
+// TODO(要確認): 武器種の正式分類・武器レアリティ・追加武器の確定性能。
+// TODO(要確認): 多段武器の個別命中判定・ダメージ処理。現在の選択候補は1 HITのみ。
+function canEquipWeapon(job,weapon){
+  if(!job||!weapon)return false;
+  const access=job.weaponAccess;
+  return access?.type==="ALL"||(access?.type==="TYPES"&&access.types?.includes(weapon.weaponType));
+}
+function weaponTypeLabel(type){return {BLADE:"刃物",LEGACY:"未設定"}[type]||type;}
+function weaponStatKey(weapon){return weapon.mainStat||"STR";}
+function weaponPower(c){return calcScaled(c.weapon.basePower,c.stats[weaponStatKey(c.weapon)]);}
+
 const ENEMIES = [
   {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,pattern:["ATTACK","ATTACK","GUARD"]},
   {id:"E02",name:"違法義体狩り",baseHp:39,atk:8,pattern:["ATTACK","HEAVY","ATTACK"]},
@@ -65,11 +84,11 @@ let state = load() || freshState();
 const combatResolutionTimers=new WeakMap();
 
 function freshState(){
-  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null};
+  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null, createDraft:null};
 }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function load(){
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+  try { return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY))); } catch { return null; }
 }
 function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
 function rand(min,max){ return Math.random()*(max-min)+min; }
@@ -77,20 +96,39 @@ function irand(min,max){ return Math.floor(rand(min,max+1)); }
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 function statLabel(k){ return {VIT:"体力",STR:"腕力",DEX:"器用",INT:"頭脳"}[k] || k; }
 
-function createCharacter(name){
+function normalizeState(saved){
+  if(!saved||!Array.isArray(saved.slots))return null;
+  saved.slots.forEach(c=>{
+    if(!c)return;
+    // Preserve every legacy stat, HP value, Memory state and installed Module.
+    c.jobId??="LEGACY";
+    if(c.weapon){
+      c.weapon.mainStat??="STR";c.weapon.hitCount??=1;
+      c.weapon.weaponType??="LEGACY";c.weapon.rarity??=null;
+    }
+  });
+  saved.createDraft??=null;
+  return saved;
+}
+function newCreationDraft(slotIndex){
+  return {slotIndex,name:"名無し",jobId:JOBS[0].id,weaponId:null,memoryIds:MEMORIES.slice(0,4).map(m=>m.id)};
+}
+function creationName(value){return Array.from(String(value||"").trim()).slice(0,16).join("")||"名無し";}
+function validCreationDraft(d){
+  if(!d)return false;
+  const job=JOBS.find(x=>x.id===d.jobId),weapon=WEAPONS.find(x=>x.id===d.weaponId);
+  return canEquipWeapon(job,weapon)&&Array.isArray(d.memoryIds)&&d.memoryIds.length===4&&new Set(d.memoryIds).size===4&&d.memoryIds.every(id=>MEMORIES.some(m=>m.id===id));
+}
+function createCharacter(draft){
+  if(!validCreationDraft(draft))throw new Error("Invalid character loadout");
+  const job=JOBS.find(x=>x.id===draft.jobId),weapon=WEAPONS.find(x=>x.id===draft.weaponId);
+  // TODO(要確認): VITから最大HPを算出する正式式。現在は42を維持する。
   return {
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    name: name || "NO-NAME",
-    stats:{VIT:10,STR:8,DEX:8,INT:8},
-    maxHp:42,
-    hp:42,
-    weapon:{id:"W001",name:"鉄管ブレード",basePower:9,hit:90},
-    memories:MEMORIES.map(m=>({
-      definitionId:m.id,currentCT:0,breakageRate:0,broken:false,modules:[]
-    })),
-    depth:0,
-    wins:0,
-    createdAt:Date.now()
+    id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
+    name:creationName(draft.name),jobId:job.id,stats:{...job.stats},maxHp:42,hp:42,
+    weapon:{...weapon},
+    memories:draft.memoryIds.map(definitionId=>({definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]})),
+    depth:0,wins:0,createdAt:Date.now()
   };
 }
 
@@ -98,6 +136,7 @@ function calcScaled(base, stat){
   return Math.max(1, Math.round(base * (1 + Math.sqrt(Math.max(0,stat)) * 0.12)));
 }
 function getMemDef(inst){ return MEMORIES.find(m=>m.id===inst.definitionId); }
+function memoryIcon(inst){const d=getMemDef(inst);return d.icon||`assets/action-${MEMORIES.indexOf(d)+1}.svg`;}
 
 function newRun(char){
   char.hp = char.maxHp;
@@ -225,14 +264,14 @@ function renderPlay(){
     return `<button class="btn slot" data-slot="${i}">
       <div class="kicker">SLOT 0${i+1}</div>
       <div class="name">${esc(c.name)}</div>
-      <div class="meta">HP ${c.hp}/${c.maxHp} / STR ${c.stats.STR} / DEX ${c.stats.DEX} / INT ${c.stats.INT}<br>最深部 ${c.depth}</div>
+      <div class="meta">${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}<br>HP ${c.hp}/${c.maxHp} / STR ${c.stats.STR} / DEX ${c.stats.DEX} / INT ${c.stats.INT}<br>最深部 ${c.depth}</div>
     </button>`;
   }).join("");
   el.innerHTML = top()+`
   <section class="panel"><div class="kicker">PLAY</div><h2>CHARACTER SLOTS</h2><p class="small muted">最大3体。死亡したキャラクターは消失します。</p></section>
   <section class="grid grid3">${slots}</section>
   <button class="btn ghost" data-nav="home">← HOME</button>`+footer();
-  document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.activeSlot=+b.dataset.new;state.screen="create";save();render();});
+  document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.activeSlot=+b.dataset.new;if(state.createDraft?.slotIndex!==state.activeSlot)state.createDraft=newCreationDraft(state.activeSlot);state.screen="create";save();render();});
   document.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{
     state.activeSlot=+b.dataset.slot;
     const c=state.slots[state.activeSlot];
@@ -244,30 +283,68 @@ function renderPlay(){
   bindNav();
 }
 
+function creationIcon(kind){
+  const paths={name:"M9 2h6v2h2v6h-2v2H9v-2H7V4h2zM7 14h10v2h2v6H5v-6h2z",job:"M8 3h8v4h5v14H3V7h5zM10 5v2h4V5zM3 11v2h7v2h4v-2h7v-2z",weapon:"M3 2h3l15 17-3 3L3 5zM18 2h3v3L6 22l-3-3z",memory:"M7 2h2v3h2V2h2v3h2V2h2v3h2v2h3v2h-3v2h3v2h-3v2h3v2h-3v2h-2v3h-2v-3h-2v3h-2v-3H9v3H7v-3H5v-2H2v-2h3v-2H2v-2h3V9H2V7h3V5h2zM8 8v8h8V8z"};
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[kind]}" fill-rule="evenodd"/></svg>`;
+}
 function renderCreate(){
-  el.innerHTML=top()+`
-  <section class="panel">
-    <div class="kicker">NEW BODY</div><h2>キャラクター作成</h2>
-    <label class="small muted">呼称</label>
-    <input id="nameInput" type="text" maxlength="16" placeholder="NAME" value="名無し">
-    <div style="height:12px"></div>
-    <div class="stats">
-      <div class="stat"><span>VIT</span><b>10</b></div>
-      <div class="stat"><span>STR</span><b>8</b></div>
-      <div class="stat"><span>DEX</span><b>8</b></div>
-      <div class="stat"><span>INT</span><b>8</b></div>
-    </div>
-    <p class="rule-note">ALPHAでは初期ステータスを固定しています。職業・初期値は正式仕様では未確定です。</p>
-    <button class="btn primary" id="createBtn"><div class="title">BODY INITIALIZE</div><div class="meta">この身体でNEHANへ入る</div></button>
-  </section>
-  <button class="btn ghost" data-nav="play">← BACK</button>`+footer();
-  document.querySelector("#createBtn").onclick=()=>{
-    const name=document.querySelector("#nameInput").value.trim()||"名無し";
-    const c=createCharacter(name);
-    state.slots[state.activeSlot]=c;
+  if(!Number.isInteger(state.activeSlot)||state.activeSlot<0||state.activeSlot>=ALPHA.maxSlots||state.slots[state.activeSlot]){state.screen="play";return render();}
+  if(state.createDraft?.slotIndex!==state.activeSlot)state.createDraft=newCreationDraft(state.activeSlot);
+  const d=state.createDraft,job=JOBS.find(x=>x.id===d.jobId),weapon=WEAPONS.find(x=>x.id===d.weaponId);
+  const rows=[["name","名前",creationName(d.name)],["job","職業",job?.name||"未選択"],["weapon","武器",weapon?.name||"武器を選択"],["memory","メモリ",`${d.memoryIds.filter(id=>MEMORIES.some(m=>m.id===id)).length} / 4`]];
+  el.innerHTML=`<section class="creation-viewport" aria-label="キャラクター作成"><div class="creation-scene">
+    <img class="creation-background" src="assets/creation-garage.webp" alt="" aria-hidden="true">
+    <div class="creation-rows">${rows.map(([kind,label,value])=>`<button class="creation-row cut-frame" data-edit="${kind}" aria-label="${label}：${esc(value)}"><span class="creation-row-icon">${creationIcon(kind)}</span><span class="creation-value">${esc(value)}</span><span class="creation-chevron" aria-hidden="true">›</span></button>`).join("")}</div>
+    <div class="creation-navigation"><button class="cut-frame" id="creationBack" aria-label="戻る"><span aria-hidden="true">‹</span><small>戻る</small></button><button class="cut-frame" id="createBtn" aria-label="作成" ${validCreationDraft(d)?"":"disabled"}><span aria-hidden="true">›</span><small>作成</small></button></div>
+  </div></section>`;
+  el.querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>openCreationEditor(button.dataset.edit));
+  el.querySelector("#creationBack").onclick=()=>{state.screen="play";save();render();};
+  el.querySelector("#createBtn").onclick=()=>{
+    if(!validCreationDraft(state.createDraft)||state.slots[state.activeSlot])return;
+    const c=createCharacter(state.createDraft);
+    state.slots[state.activeSlot]=c;state.createDraft=null;
     state.run=newRun(c);state.run.ownerId=c.id;state.screen="run";save();render();
   };
-  bindNav();
+}
+function openCreationEditor(kind){
+  const d=state.createDraft,draft={...d,memoryIds:[...d.memoryIds]},job=JOBS.find(x=>x.id===draft.jobId);
+  const titles={name:"名前",job:"職業",weapon:"武器",memory:"メモリ"};
+  let body="";
+  if(kind==="name")body=`<label for="nameInput">名前（最大16文字）</label><input id="nameInput" type="text" maxlength="16" autocomplete="off" value="${esc(draft.name)}">`;
+  if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}</span></span></label>`).join("");
+  if(kind==="weapon")body=WEAPONS.map(w=>`<label class="creation-option"><input type="radio" name="creationWeapon" value="${w.id}" ${draft.weaponId===w.id?"checked":""} ${canEquipWeapon(job,w)?"":"disabled"}><span><b>${esc(w.name)}</b><span class="creation-option-detail">武器種 ${esc(weaponTypeLabel(w.weaponType))} · 攻撃 ${w.basePower}<br>命中 ${w.hit}% · ${w.mainStat} · ${w.hitCount} HIT</span></span></label>`).join("");
+  if(kind==="memory")body=`<div class="creation-memory-slots">${draft.memoryIds.map((id,i)=>`<label>MEMORY 0${i+1}<select data-memory-slot="${i}" aria-label="メモリ${i+1}">${MEMORIES.map(m=>`<option value="${m.id}" ${m.id===id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></label>`).join("")}</div><p class="creation-edit-note">選択済みのメモリを選ぶと、スロットを入れ替えます。</p>`;
+  const editor=document.createElement("div");editor.className="creation-editor";
+  editor.innerHTML=`<form class="creation-edit-card" role="dialog" aria-modal="true" aria-labelledby="creationEditorTitle"><h2 id="creationEditorTitle">${titles[kind]}</h2><div class="creation-edit-body">${body}</div><div class="creation-edit-actions"><button type="button" id="cancelCreationEdit">戻る</button><button type="submit" id="confirmCreationEdit">決定</button></div></form>`;
+  const view=el.querySelector(".creation-viewport"),opener=el.querySelector(`[data-edit="${kind}"]`);view.inert=true;el.appendChild(editor);
+  function close(){editor.remove();view.inert=false;opener.focus();}
+  editor.querySelector("#cancelCreationEdit").onclick=close;
+  editor.onkeydown=e=>{
+    if(e.key==="Escape"){e.preventDefault();close();}
+    if(e.key==="Tab"){
+      const nodes=[...editor.querySelectorAll('button:not(:disabled),input:not(:disabled),select')],first=nodes[0],last=nodes[nodes.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  };
+  editor.querySelectorAll("[data-memory-slot]").forEach(select=>select.onchange=()=>{
+    const i=+select.dataset.memorySlot,other=draft.memoryIds.indexOf(select.value),old=draft.memoryIds[i];
+    // TODO(要確認): 同一MemoryDefinitionの複数装備可否。現在は重複禁止。
+    if(other!==-1&&other!==i)draft.memoryIds[other]=old;
+    draft.memoryIds[i]=select.value;
+    editor.querySelectorAll("[data-memory-slot]").forEach(node=>node.value=draft.memoryIds[+node.dataset.memorySlot]);
+  });
+  editor.querySelector("form").onsubmit=e=>{
+    e.preventDefault();
+    if(kind==="name")draft.name=creationName(editor.querySelector("#nameInput").value);
+    if(kind==="job"){
+      draft.jobId=editor.querySelector('input[name="creationJob"]:checked')?.value||null;
+      if(!canEquipWeapon(JOBS.find(x=>x.id===draft.jobId),WEAPONS.find(x=>x.id===draft.weaponId)))draft.weaponId=null;
+    }
+    if(kind==="weapon")draft.weaponId=editor.querySelector('input[name="creationWeapon"]:checked')?.value||null;
+    state.createDraft=draft;save();close();render();el.querySelector(`[data-edit="${kind}"]`).focus();
+  };
+  editor.querySelector("input:not(:disabled),select,button").focus();
 }
 
 function renderRun(){
@@ -336,7 +413,7 @@ function renderMap(c){
   });
   bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>`戦闘 → ${r.future.map(()=>"戦闘").join(" / ")}`).join("<br>")}</p>`,()=>{});
   bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
-  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${calcScaled(c.weapon.basePower,c.stats.STR)} / 命中 ${c.weapon.hit}%</p>`,()=>{});
+  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${weaponPower(c)} / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p>`,()=>{});
   document.querySelectorAll("[data-memory]").forEach(button=>{
     bindActionHold(button,()=>memoryDescription(c,c.memories[+button.dataset.memory]),()=>{});
   });
@@ -403,7 +480,7 @@ function renderCombat(c){
     </div>
   </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
-  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${calcScaled(c.weapon.basePower,c.stats.STR)} ダメージ / 命中 ${c.weapon.hit}%</p><p>使用するとターン終了。</p><p class="muted">${c.weapon.basePower} × (1 + √STR × 0.12)</p>`,()=>useWeapon(c));
+  bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${weaponPower(c)} ダメージ / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p><p>使用するとターン終了。</p><p class="muted">${c.weapon.basePower} × (1 + √${weaponStatKey(c.weapon)} × 0.12)</p>`,()=>useWeapon(c));
   document.querySelectorAll("[data-memory]").forEach(button=>{
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
@@ -414,7 +491,7 @@ function renderCombat(c){
 }
 
 function renderMemory(c,m,i,readOnly=false){
-  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
+  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="${memoryIcon(m)}" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
 function memoryDescription(c,m){
   const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
@@ -464,7 +541,7 @@ function useWeapon(c){
   if(!rollHit(c.weapon.hit)){
     logMsg(`${c.weapon.name}: MISS`,"bad");
   }else{
-    const raw=calcScaled(c.weapon.basePower,c.stats.STR);
+    const raw=weaponPower(c);
     const dealt=applyEnemyDamage(raw);
     logMsg(`${c.weapon.name}: ${dealt} damage`,"good");
   }

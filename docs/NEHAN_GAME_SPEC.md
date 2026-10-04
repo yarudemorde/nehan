@@ -1,7 +1,7 @@
 # NEHAN Game Specification
 
 > Development-facing specification for AI-assisted implementation.
-> Last updated: 2026-10-03
+> Last updated: 2026-10-04
 > Status labels used in this document:
 > - **CONFIRMED**: User-approved current specification. Implement as written unless a newer explicit instruction overrides it.
 > - **UNRESOLVED**: Not yet decided. Do not invent behavior. Add `TODO(要確認)` or isolate behind configurable data.
@@ -83,7 +83,7 @@ The home screen contains:
 
 - Whether all 3 slots are unlocked from the start.
 - Exact deletion/abandonment rules for a living character.
-- Exact new-character creation options.
+- Additional creation options beyond the confirmed initial loadout below.
 
 ## 2.3 INVENTORY — CONFIRMED AT HIGH LEVEL
 
@@ -176,11 +176,41 @@ Each character has:
 - **Weapon ×1**
 - **Memory ×4**
 
-## 3.4 Occupation / class — UNRESOLVED
+## 3.4 Occupation / class — CONFIRMED
 
-The game has an occupation/class field, but occupations, starting stats, starting weapons, starting Memories, and occupation-specific abilities have not yet been defined.
+The initial occupation is **賞金稼ぎ** (`JOB_BOUNTY_HUNTER`), a balanced class.
 
-Do not invent official occupations in production data.
+| Stat | Starting value |
+|---|---:|
+| VIT | 6 |
+| STR | 8 |
+| DEX | 7 |
+| INT | 5 |
+
+- Primary ability: **STR**.
+- Secondary ability: **DEX**.
+- Unique ability: **武器習熟** (`WEAPON_MASTERY`).
+- Ability effect: **すべての武器種を装備できる。**
+- Occupations are static JobDefinitions with structured weapon-access rules. `canEquipWeapon()` is the single access check; do not branch on display names.
+- Additional occupations and their balance are **UNRESOLVED**.
+
+## 3.4.1 Creation and initial loadout — CONFIRMED
+
+A single garage screen contains four equal selection rows: **名前 / 職業 / 武器 / メモリ**. Each opens an independent editor; creation is not a sequential wizard. No large title is shown. Frames, icons, values and arrows are HTML/CSS UI over a background-only garage asset.
+
+- Name: maximum 16 characters; a blank value becomes **名無し**.
+- Select one occupation, exactly **Weapon ×1**, and exactly **Memory ×4**.
+- A `createDraft` stores the selected values for its empty slot. Editing and returning to PLAY retain that draft; they do not create a CharacterState in `slots`.
+- Only the lower-right creation button validates and commits the character, then starts `newRun()` and opens MAP. The button is disabled until the selected occupation, compatible weapon and four distinct valid Memory IDs are present.
+- Initial Memory definitions are M001 破砕, M002 速断, M003 応急修復, M004 防壁展開. They default to all four selected. Selecting a Memory already in another slot swaps the two positions without creating duplicates.
+- Each selected Memory generates an independent `{definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]}` instance. Static definitions never store those mutable fields.
+- Current duplicate policy: duplicates are prohibited. The final duplicate-equipment rule remains **UNRESOLVED** (`TODO(要確認)`).
+- New CharacterState stores `jobId`, a copy of the occupation's `stats`, and independent `weapon` / `memories` instances. Existing `c.stats`, `c.weapon`, `c.memories` access remains compatible with MAP, Combat and Inventory.
+- **Current implementation HP remains 42/42.** A derived VIT-to-HP formula is **UNRESOLVED**; do not invent one.
+- WeaponDefinition is separate from character creation and carries `id`, `name`, `weaponType`, `basePower`, `mainStat`, `hit`, `hitCount`, `rarity`. The current selectable catalog uses the existing 鉄管ブレード (W001, base power 9, hit 90%, STR, 1 HIT). Its `BLADE` type is an implementation category, not a finalized taxonomy. Its rarity is unset. The example 打刀 does not establish a new production weapon.
+- Weapon scaling reads `weapon.mainStat` (fallback STR) through the existing `calcScaled()` formula. Current selectable weapons use one hit; per-hit multi-hit resolution remains **UNRESOLVED**.
+- The draft and completed characters use the existing `nehan_alpha_v1` storage key. Legacy characters preserve HP, stats, weapon performance, Memory CT/breakage/broken state and installed Modules. Missing `jobId` becomes LEGACY (職業未設定), missing weapon `mainStat` becomes STR, `hitCount` becomes 1, and `weaponType` becomes LEGACY. Do not clear storage or replace legacy stats with the new occupation stats.
+- Mobile screen has no page scrolling, respects safe areas and 44px minimum action targets. The name editor fits the existing visualViewport handling while the software keyboard is shown.
 
 ## 3.5 Character stat growth — PARTIALLY CONFIRMED
 
@@ -677,6 +707,7 @@ Use separate concepts for static definitions and mutable player-owned instances.
 ### Static definition examples
 
 ```ts
+JobDefinition
 MemoryDefinition
 ModuleDefinition
 WeaponDefinition
@@ -923,9 +954,10 @@ These should remain visible in issues/code comments/spec tasks rather than being
 
 ## Character
 
-- Occupations/classes.
-- Initial stats.
-- Initial loadouts.
+- Additional occupations/classes beyond 賞金稼ぎ.
+- VIT-to-maximum-HP formula.
+- Additional starting weapons and finalized weapon rarity/type taxonomy.
+- Final duplicate-Memory equipment rule.
 - Additional stat-growth methods besides Modules.
 
 ## Death / persistence
