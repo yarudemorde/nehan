@@ -13,7 +13,7 @@ const c={id:'equipment-body',jobId:'JOB_BOUNTY_HUNTER',name:'賞金稼ぎ',stats
 const fixture={slots:[c,null,null],activeSlot:0,screen:'run',run:{ownerId:c.id,depth:0,phase:'map',shield:0,combat:null,routes:[{side:'L',enemyId:'E01',future:['廃棄ドローン','逆接僧兵']},{side:'R',enemyId:'E02',future:['違法義体狩り','逆接僧兵']}],log:[]}};
 await p.addInitScript(f=>{Math.random=()=>.25;if(!localStorage.getItem('nehan_alpha_v1'))localStorage.setItem('nehan_alpha_v1',JSON.stringify(f))},fixture);await open(p);
 assert.deepEqual((await read(p)).slots[0].memories.map(x=>x.moduleSlots),[1,1,5,2]);
-await p.locator('#playerDetails').click();let manager=p.locator('.character-overlay');assert(await manager.isVisible());assert((await manager.innerText()).includes('HP 35 / 42'));assert.equal(await manager.locator('[data-equipment]').count(),5);
+await p.locator('#playerDetails').click();let manager=p.locator('.character-overlay');assert(await manager.isVisible());assert((await manager.innerText()).includes('HP 35 / 42'));assert.equal(await manager.locator('[data-equipment]').count(),6);
 await manager.locator('[data-equipment="equipped-three"]').click();assert.equal(await manager.locator('.module-slot').count(),5);
 for(const [width,height] of [[320,568],[375,667],[390,844],[393,852],[430,932]]){
  await p.setViewportSize({width,height});await p.waitForFunction(()=>Math.abs(document.querySelector('#app').getBoundingClientRect().height-innerHeight)<1);

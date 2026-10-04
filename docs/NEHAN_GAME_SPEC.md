@@ -101,7 +101,7 @@ Character selection itself belongs under PLAY, not INVENTORY.
 
 - Exact storage capacity.
 - Sorting/filtering rules.
-- Whether unequipped weapons are stored here.
+- Unequipped weapons are stored in character inventory.weapons (see confirmed MAP node addendum).
 - Whether a recovered Memory must be assigned immediately to a new character or may remain in persistent storage.
 
 ## 2.4 SHOP — CONFIRMED AS MENU / UNRESOLVED IN DETAIL
@@ -246,9 +246,9 @@ From the current position:
 
 The intent is to allow route planning and risk/reward decisions.
 
-## 4.3 Node categories — PROPOSAL / NOT YET CANONICAL
+## 4.3 Node categories — PARTIALLY CONFIRMED
 
-The planning sheet currently contains candidate node types such as:
+Battle, Garage and Scrap are implemented and confirmed in the 2026-10-05 addendum below. Other candidate node types remain proposals:
 
 - 戦闘
 - 強敵
@@ -1077,3 +1077,33 @@ When implementing future user instructions:
 - 中央詳細はアイテムのレア度、武器種またはMemoryカテゴリ・実行種別、基礎攻撃力→実効値、命中、参照能力、ヒット数またはCT・破損状態とSlot一覧を表示する。確認時には実際のModule個体効果・取得深度と上書きによる旧個体消失を表示する。
 - Inventoryから利用でき、Character / Equipmentの空きSlotおよび装着済みModule詳細のOVERWRITEからも同じ専用画面へ入る。所持Memoryへの装着は専用画面内の選択欄から継続利用できる。
 - 画面の選択状態は一時的なUI状態。既存Runや保存形式は変更しない。Install / Overwriteは既存共通関数を通し、単独取り外し禁止、Slot上限、戦闘中変更禁止、装備中だけの補正を維持する。確定後も工房画面に留まり、残りModuleを装着できる。戻ると元のInventoryまたはCharacter / Equipmentへ復帰する。
+
+
+## MAPノード：戦闘・ガレージ・スクラップ — CONFIRMED (2026-10-05)
+
+- Nodeは `{id, side, type, enemyId?, future:[Node, Node]}`。typeはbattle / garage / scrap。Futureは文字列ではなく個体IDとtype（戦闘ならenemyId）を持つ予告。選択後の次MAPは選択したNodeのfutureを左右の選択肢として引き継ぐ。予告は進行操作を行わず種類だけを表示する。
+- `NODE_DEFINITIONS` に日本語名・短縮表示・SVGアイコン・入場処理を登録する。MAP背景と六角形位置は維持し、戦闘の敵名は表示しない。現行 `NODE_WEIGHTS` はbattle 60 / garage 20 / scrap 20。左右と新しい予告は独立抽選し、同じ種類の2択も許可する。
+- Battleは従来のCombatと敵撃破Loot（MEMORY 20% / MODULE 80%）を維持する。撃破時にはLootを保存してphase=lootへ移行し、回収するまでDepthを増やさない。Winsは撃破時に一度加算する。
+- Garageはphase=garage。修復で `getEffectiveMaxHp(c)` までHP全回復して次MAPへ進む。立ち去る場合もノードを消費して次MAPへ進むがHPは変えない。CT、破損率、BROKEN、Module、装備、SHIELDは変更しない。Homeへ戻ってもphaseを保持し、PLAYから未完了Garageへ復帰する。
+- Scrapはphase=scrap。入場時に `generateScrapLoot(depth)` で一個生成して `run.scrapLoot` を保存し、表示・reloadで再抽選しない。`SCRAP_DROP` はWEAPON 0.5 / MEMORY 0.5、MODULEは含まない。WEAPONS / MEMORIESから定義を抽選し、Instance化してから深度別rarityを設定する。
+- Weapon Instanceは定義のid・性能をコピーし、instanceId / rarity / moduleSlots / modules / generatedDepthを保持する。Memoryは既存 `createMemoryInstance()` を利用する。Slot数はCOMMON 1 / UNCOMMON 2 / RARE 3 / EPIC 4 / LEGENDARY 5。
+- `inventory:{weapons:[], memories:[], modules:[]}`。Scrap回収品はそれぞれStorageへ追加し、自動装備しない。Inventory WEAPONSタブ、Character / EquipmentのSTORAGE、工房画面の所持装備選択から確認・Module装着ができる。装備武器変更機能は追加しない。Storage武器のModuleは装備していないためキャラクター能力へ反映しない。
+- `advanceDepth()` はLoot回収、Garage修復／立ち去り、Scrap回収の完了後に一度だけDepthを増やす。phaseとownerIdを確認し、完了後はmapへ移行して選択Nodeと未回収Lootを削除する。最深部 `c.depth` は完了Depthの最大値。踏破数 `c.wins` は従来どおり敵撃破数であり、Garage/Scrapでは増やさない。
+- 保存キーを維持。旧routeの欠落typeはbattle、旧Future敵名文字列はbattle Nodeへ変換する。`inventory.weapons` がなければ空配列を補完する。旧mainの回収待ちLootは既にDepth増加済みのため、`lootDepthAdvanced=true`で追加加算を避ける。新規Lootはfalseを保存する。Garage phase、Scrap phase、scrapLoot、予告Node、Storage Weapon個体を保存する。
+- GarageとScrapは既存工房背景を流用した別画面。9:16固定・safe-area・全体スクロールなし。Module工房・Combat・Character作成画面の構成を変更しない。
+
+### Scrapレア度：現行実装パラメータ（最終バランスはTODO / 要確認）
+
+| 深度 | COMMON | UNCOMMON | RARE | EPIC | LEGENDARY |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0 | 85% | 12% | 2.5% | 0.4% | 0.1% |
+| 10 | 55% | 28% | 13% | 3.5% | 0.5% |
+| 20 | 25% | 30% | 30% | 13% | 2% |
+| 30 | 12% | 20% | 33% | 28% | 7% |
+| 50以上 | 5% | 10% | 25% | 38% | 22% |
+
+`rollItemRarity()` は表の深度間を線形補間して重み付き抽選する。レア度のみを変え、武器・Memoryの基礎性能は変更しない。極浅層にも高レア、深層にもCOMMONの可能性を残す。
+
+// TODO(要確認): Node確率、Scrap Weapon/Memory比率、深度別レア度重みの最終バランス。
+
+// TODO(要確認): EVENT / BLACK_MARKET / BOSS / REST / ELITEの個別仕様は今回追加しない。
