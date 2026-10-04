@@ -1068,3 +1068,12 @@ When implementing future user instructions:
 // TODO(要確認): 生成値の範囲・深度スケール上限・効果数と負効果の抽選重みの最終バランス。
 
 // TODO(要確認): Module補正後BASE_POWERの正式な最低値。現行は入力値を最低0とし、既存calcScaledの最低ダメージ1を維持する。
+
+
+## Module Install専用画面 — CONFIRMED (2026-10-05)
+
+- `openModuleInstall()` は工房背景 `assets/module-install-bg.webp` を使う全画面UIを開く。9:16キャンバスをsafe-area内で中央配置し、背景864×1536を切らず表示する。画面全体はスクロールせず、未使用Module一覧だけを内部スクロールにする。
+- 下部は装備武器＋4Memoryの5アイコン固定。名前、Module使用数／容量、選択状態を表示する。装着先→Slot→未使用Module→確認の順で操作し、空きSlotはINSTALL、使用中SlotはOVERWRITE。
+- 中央詳細はアイテムのレア度、武器種またはMemoryカテゴリ・実行種別、基礎攻撃力→実効値、命中、参照能力、ヒット数またはCT・破損状態とSlot一覧を表示する。確認時には実際のModule個体効果・取得深度と上書きによる旧個体消失を表示する。
+- Inventoryから利用でき、Character / Equipmentの空きSlotおよび装着済みModule詳細のOVERWRITEからも同じ専用画面へ入る。所持Memoryへの装着は専用画面内の選択欄から継続利用できる。
+- 画面の選択状態は一時的なUI状態。既存Runや保存形式は変更しない。Install / Overwriteは既存共通関数を通し、単独取り外し禁止、Slot上限、戦闘中変更禁止、装備中だけの補正を維持する。確定後も工房画面に留まり、残りModuleを装着できる。戻ると元のInventoryまたはCharacter / Equipmentへ復帰する。

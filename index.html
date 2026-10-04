@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=1.1">
+<link rel="stylesheet" href="style.css?v=1.2">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -855,31 +855,72 @@ function equipmentDialog(className,title,onClose=()=>{}){
   };
   return {overlay,body:overlay.querySelector(".equipment-dialog-body"),close};
 }
-function openModuleInstall(c,moduleId,{targetId=null,slotIndex=null,onDone=renderInventory}={}){
-  if(!canModifyEquipment(c))return;
-  const module=c.inventory.modules.find(m=>m.instanceId===moduleId);if(!module||!getModuleDef(module))return;
-  const {overlay,body,close}=equipmentDialog("module-install-overlay","インストール先");
-  body.innerHTML=`<div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}">${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div>`;
-  const cancel=overlay.querySelector(".equipment-dialog-close");cancel.id="cancelInstall";cancel.textContent="CANCEL";
-  function confirmSlot(id,slot){
-    const target=installTargets(c).find(i=>i.instanceId===id);
-    if(!target||slot<0||slot>=target.moduleSlots||!canModifyEquipment(c))return;
-    const old=moduleAtSlot(target,slot),oldId=old?.instanceId;
-    overlay.querySelector("h3").textContent=old?"OVERWRITE":"INSTALL";
-    body.innerHTML=`${moduleSummary(module)}<p>${esc(itemName(target))} · SLOT ${slot+1}</p>${old?`<p>${esc(getModuleDef(old)?.name||old.definitionId)}を上書きします。</p><div class="overwritten-module">${moduleSummary(old)}</div><p class="negative">※上書きされたModuleは消失します。<br>※元に戻すことはできません。</p>`:`<p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p>`}<button id="${old?"confirmOverwrite":"confirmInstall"}">${old?"OVERWRITE":"INSTALL"}</button>`;
-    const confirm=body.querySelector("#confirmInstall,#confirmOverwrite");
-    confirm.onclick=()=>{const done=old?overwriteModule(c,moduleId,id,slot,oldId):installModule(c,moduleId,id,slot);if(done){close();onDone();}};confirm.focus();
+// UI-only workbench: selected targets/slots are transient, all mutations use the shared APIs.
+function openModuleInstall(c,moduleId=null,{targetId=null,slotIndex=null,onDone=()=>{if(state.screen==="inventory")renderInventory();}}={}){
+  if(!canModifyEquipment(c)||document.querySelector(".module-install-screen"))return;
+  const parent=document.querySelector(".character-overlay"),previousInert=el.inert,parentInert=parent?.inert,opener=document.activeElement;
+  const screen=document.createElement("section");screen.className="module-install-screen module-install-overlay";
+  screen.setAttribute("role","dialog");screen.setAttribute("aria-modal","true");screen.setAttribute("aria-label","MODULE INSTALL 改造机");
+  screen.innerHTML=`<div class="module-install-viewport"><div class="module-install-canvas">
+    <img class="module-install-background" src="assets/module-install-bg.webp" alt="" aria-hidden="true" width="864" height="1536">
+    <header class="module-install-header"><button class="module-install-back" aria-label="装着画面を閉じて戻る">‹ 戻る</button><div><h2>MODULE INSTALL</h2><span>改造机</span></div></header>
+    <div class="module-install-storage"></div><div class="module-install-detail"></div>
+    <section class="module-install-list-panel"><h3>未使用MODULE</h3><div class="module-install-list" aria-label="インストール候補"></div></section>
+    <div class="module-install-targets" aria-label="装着先選択"></div>
+  </div></div>`;
+  el.inert=true;if(parent)parent.inert=true;document.body.appendChild(screen);
+  const canvas=screen.querySelector(".module-install-canvas"),detail=screen.querySelector(".module-install-detail"),list=screen.querySelector(".module-install-list"),targets=screen.querySelector(".module-install-targets"),storage=screen.querySelector(".module-install-storage");
+  let currentId=targetId,selectedSlot=slotIndex,confirmation=null,closed=false;
+  const target=()=>installTargets(c).find(i=>i.instanceId===currentId);
+  const close=()=>{if(closed)return;closed=true;screen.remove();el.inert=previousInert;if(parent?.isConnected)parent.inert=parentInert;onDone();if(opener?.isConnected)opener.focus();};
+  screen.querySelector(".module-install-back").onclick=close;
+  function selectTarget(id){currentId=id;selectedSlot=null;paint();targets.querySelector(`[data-install-target="${id}"]`)?.focus();}
+  function paint(){
+    const item=target(),locked=!canModifyEquipment(c);
+    if(item&&(!Number.isInteger(selectedSlot)||selectedSlot<0||selectedSlot>=item.moduleSlots))selectedSlot=null;
+    targets.innerHTML=[c.weapon,...c.memories].map((i,n)=>`<div class="action-cell"><button class="action-icon" data-install-target="${esc(i.instanceId)}" aria-pressed="${i.instanceId===currentId}" aria-label="${esc(itemName(i))}、Module ${i.modules.length} / ${i.moduleSlots}"><img src="${n?memoryIcon(i):"assets/action-weapon.svg"}" alt=""></button><span class="action-name">${esc(itemName(i))}</span><span class="module-target-capacity">${i.modules.length} / ${i.moduleSlots}</span></div>`).join("");
+    targets.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>selectTarget(b.dataset.installTarget));
+    // Preserve installation into Storage Memories without adding a sixth equipped icon.
+    storage.innerHTML=c.inventory.memories.length?`<select aria-label="所持メモリへの装着" id="moduleStorageTarget"><option value="">所持MEMORYへ装着</option>${c.inventory.memories.map(m=>`<option value="${esc(m.instanceId)}" ${m.instanceId===currentId?"selected":""}>${esc(itemName(m))} · ${m.modules.length}/${m.moduleSlots}</option>`).join("")}</select>`:"";
+    if(storage.firstElementChild)storage.firstElementChild.onchange=e=>{if(e.target.value)selectTarget(e.target.value);};
+    if(!item){detail.innerHTML=`<div class="module-install-guide">装着先を選択してください</div>`;}
+    else{
+      const memory=item!==c.weapon,d=memory?getMemDef(item):null,old=selectedSlot!==null?moduleAtSlot(item,selectedSlot):null;
+      detail.innerHTML=`<div class="module-target-heading"><b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · ${memory?`${esc(d.category)} / ${d.execution}`:esc(item.weaponType)}</small></div>
+        <p class="module-target-spec">BASE POWER ${basePowerDescription(item)} · MAIN ${memory?d.main:weaponStatKey(item)}<br>HIT ${memory?d.hit:item.hit}% · ${memory?`CT ${item.currentCT}/${d.ct} · 破損 ${item.breakageRate.toFixed(2)}%${item.broken?" · BROKEN":""}`:`HIT COUNT ${item.hitCount||1}`}</p>
+        <div class="module-install-slot-heading">MODULE ${item.modules.length} / ${item.moduleSlots}</div>
+        <div class="module-install-slots" style="--slot-count:${item.moduleSlots}">${Array.from({length:item.moduleSlots},(_,slot)=>{const m=moduleAtSlot(item,slot),name=m?(getModuleDef(m)?.name||m.definitionId):"EMPTY";return `<button data-install-slot="${slot}" ${m?`data-overwrite-slot="${slot}"`:""} aria-pressed="${slot===selectedSlot}" aria-label="SLOT ${slot+1} ${esc(name)}、${m?"OVERWRITE":"INSTALL"}"><span>SLOT ${slot+1}</span><b>${esc(name)}</b></button>`;}).join("")}</div>
+        <p class="module-selected-slot" role="status">${selectedSlot===null?"Slotを選択してください":`SLOT ${selectedSlot+1} · ${old?`${esc(getModuleDef(old)?.name||old.definitionId)}を上書き`:"EMPTY / INSTALL"}`}</p>`;
+      detail.querySelectorAll("[data-install-slot]").forEach(b=>b.onclick=()=>{selectedSlot=+b.dataset.installSlot;paint();detail.querySelector(`[data-install-slot="${selectedSlot}"]`)?.focus();});
+    }
+    const old=item&&selectedSlot!==null?moduleAtSlot(item,selectedSlot):null,ready=!!item&&selectedSlot!==null&&!locked;
+    list.innerHTML=c.inventory.modules.map(m=>`<button class="module-workbench-choice" data-pick-module="${esc(m.instanceId)}" ${ready&&getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}<span class="module-install-mode">${locked?"戦闘中は変更不可":!item?"装着先を選択":selectedSlot===null?"Slotを選択":old?"OVERWRITE ›":"INSTALL ›"}${moduleId===m.instanceId?" · 選択Module":""}</span></button>`).join("")||`<p class="module-install-empty">未使用モジュールなし。</p>`;
+    list.querySelectorAll("[data-pick-module]").forEach(b=>b.onclick=()=>confirmModule(b.dataset.pickModule));
   }
-  function chooseTarget(id){
-    const target=installTargets(c).find(i=>i.instanceId===id);if(!target)return;
-    const empty=firstEmptyModuleSlot(target);
-    if(slotIndex!==null){confirmSlot(id,slotIndex);return;}
-    if(empty!==-1){confirmSlot(id,empty);return;}
-    body.innerHTML=`${moduleSummary(module)}<p>上書きするSlotを選択</p><div class="install-targets">${Array.from({length:target.moduleSlots},(_,slot)=>`<button data-overwrite-slot="${slot}">SLOT ${slot+1} · ${esc(getModuleDef(moduleAtSlot(target,slot))?.name||"装着Module")}</button>`).join("")}</div>`;
-    body.querySelectorAll("[data-overwrite-slot]").forEach(b=>b.onclick=()=>confirmSlot(id,+b.dataset.overwriteSlot));body.querySelector("button").focus();
+  function confirmModule(id){
+    const item=target(),slot=selectedSlot,module=c.inventory.modules.find(m=>m.instanceId===id);
+    if(!item||slot===null||!module||!getModuleDef(module)||!canModifyEquipment(c))return;
+    const old=moduleAtSlot(item,slot),oldId=old?.instanceId,focused=document.activeElement;
+    confirmation=document.createElement("div");confirmation.className="module-workbench-confirm";
+    confirmation.innerHTML=`<section role="dialog" aria-modal="true" aria-label="${old?"OVERWRITE":"INSTALL"}確認"><h3>${old?"OVERWRITE":"INSTALL"}</h3><div class="module-confirm-description">${moduleSummary(module)}<p>${esc(itemName(item))}の SLOT ${slot+1} に<br>インストールします。</p>${old?`<div class="overwritten-module">${moduleSummary(old)}</div><p class="negative">現在の「${esc(getModuleDef(old)?.name||old.definitionId)}」は上書きされ消失します。<br>※上書きされたModuleは消失します。<br>※元に戻すことはできません。</p>`:`<p class="negative">※一度インストールしたモジュールは取り外せません。</p>`}</div><div class="module-confirm-actions"><button id="cancelInstall">CANCEL</button><button id="${old?"confirmOverwrite":"confirmInstall"}">${old?"OVERWRITE":"INSTALL"}</button></div></section>`;
+    canvas.inert=true;screen.appendChild(confirmation);
+    const dismiss=()=>{confirmation?.remove();confirmation=null;canvas.inert=false;if(focused?.isConnected)focused.focus();};
+    confirmation.querySelector("#cancelInstall").onclick=dismiss;
+    confirmation.querySelector("#confirmInstall,#confirmOverwrite").onclick=()=>{
+      const done=old?overwriteModule(c,id,item.instanceId,slot,oldId):installModule(c,id,item.instanceId,slot);
+      if(done){dismiss();paint();detail.querySelector(`[data-install-slot="${slot}"]`)?.focus();}
+      else{dismiss();paint();screen.querySelector(".module-install-back").focus();}
+    };
+    confirmation.dismiss=dismiss;confirmation.querySelector("#cancelInstall").focus();
   }
-  body.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>chooseTarget(b.dataset.installTarget));
-  if(targetId)chooseTarget(targetId);else overlay.querySelector("button:not(:disabled)").focus();
+  screen.onkeydown=e=>{
+    if(e.key==="Escape"){e.preventDefault();if(confirmation)confirmation.dismiss();else close();return;}
+    if(e.key==="Tab"){
+      const root=confirmation||canvas,nodes=[...root.querySelectorAll("button:not(:disabled),select")],first=nodes[0],last=nodes.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
+    }
+  };
+  paint();screen.querySelector(".module-install-back").focus();
 }
 function equipmentList(c){
   return `<h3>EQUIPPED</h3><button class="inventory-item equipment-choice" data-equipment="${esc(c.weapon.instanceId)}"><small>WEAPON</small>${equipmentSummary(c.weapon)}<small>${esc(c.weapon.weaponType)} · BASE POWER ${basePowerDescription(c.weapon)} · MAIN ${weaponStatKey(c.weapon)} · HIT ${c.weapon.hit}% · ${c.weapon.hitCount||1} HIT</small></button>${c.memories.map((m,i)=>`<button class="inventory-item equipment-choice" data-equipment="${esc(m.instanceId)}"><small>MEMORY 0${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT}/${getMemDef(m).ct} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></button>`).join("")}`;
@@ -913,10 +954,7 @@ function openCharacterEquipment(c,initialItemId=null){
     body.scrollTop=0;overlay.querySelector("button:not(:disabled)").focus();
   }
   function openUnusedModules(item,slot){
-    const dialog=equipmentDialog("module-picker-overlay","未使用MODULE");
-    dialog.body.innerHTML=c.inventory.modules.map(m=>`<button data-pick-module="${esc(m.instanceId)}" ${getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}</button>`).join("")||"未使用モジュールなし。";
-    dialog.body.querySelectorAll("[data-pick-module]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickModule;dialog.close();if(!locked())openModuleInstall(c,id,{targetId:item.instanceId,slotIndex:slot,onDone:paint});});
-    dialog.overlay.querySelector("button:not(:disabled)").focus();
+    if(!locked())openModuleInstall(c,null,{targetId:item.instanceId,slotIndex:slot,onDone:paint});
   }
   function openInstalledModule(item,slot){
     const m=moduleAtSlot(item,slot);if(!m)return;
