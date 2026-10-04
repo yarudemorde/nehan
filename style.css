@@ -278,3 +278,15 @@ body:has(#app[data-screen="create"]){background:#000}
 .install-card button{background:#161010;color:#eee;border:1px solid #888;min-height:44px;padding:8px;cursor:pointer}.install-card button small{display:block;font-size:10px;margin-top:4px}.install-card button:disabled{opacity:.4;cursor:default}.install-card button:focus-visible,.module-choice:focus-visible{outline:2px solid #a65e66;outline-offset:-3px}.install-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 #app:is([data-screen="loot"],[data-screen="inventory"])>.btn,.loot-screen>.btn{background:#100b0c;color:#eee;border-color:#777;min-height:44px;text-align:center;flex:none}
 #app:is([data-screen="loot"],[data-screen="inventory"]) .btn:hover{border-color:#a85b65;transform:none}
+
+/* Shared equipment dialogs; only their lists scroll, never the run screen. */
+.install-overlay{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Yu Gothic",Meiryo,"NEHAN Battle Pixel",sans-serif}
+.equipment-dialog-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px}
+.equipment-dialog-body>*{flex:none}.install-card>.equipment-dialog-close{flex:none}.equipment-dialog-body h4{font-size:18px;margin:0}.equipment-dialog-body small{display:block;color:#c5b9bb;font-size:11px;line-height:1.6}
+.character-overlay{z-index:90;background:#030303;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.character-overlay>.install-card{height:100%;width:100%;max-width:430px;max-height:100dvh;border:0;padding:12px;gap:10px;background:#060505}
+.character-overlay .install-card h3{font-size:14px;letter-spacing:.05em}.character-summary{border-bottom:1px solid #555;padding-bottom:12px;line-height:1.6}.character-summary>b{font-size:20px}.character-summary>p{margin-top:6px;font-size:13px}
+.character-overlay .inventory-item{margin:0;border-color:#51464a;padding:12px;line-height:1.7}.equipment-choice{cursor:pointer;min-height:44px}.character-overlay .equipment-dialog-body{gap:10px}
+.module-slot-grid{display:grid;grid-template-columns:repeat(var(--slot-count),minmax(0,1fr));gap:6px}.module-slot-grid .module-slot{min-width:44px;min-height:44px;display:grid;place-items:center;border:1px solid #777;background:#100a0b;color:#ddd;font-size:23px;padding:4px}.module-slot-grid .occupied{color:#cfadb1;background:#1a1012}.equipment-effect{font-size:12px;line-height:1.6;color:#d1c7c9}.equipment-effect>p{margin-top:6px}
+.module-picker-overlay button,.memory-change-overlay button{text-align:left;line-height:1.6}.memory-change-overlay .installed-module,.module-picker-overlay small{margin-top:5px}
+.install-overlay .install-targets{overflow:visible;display:grid;gap:8px}.install-overlay :is(button,select):focus-visible{outline:2px solid #a65e66;outline-offset:-3px}

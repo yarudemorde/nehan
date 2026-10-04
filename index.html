@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=0.9">
+<link rel="stylesheet" href="style.css?v=1.0">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -83,7 +83,7 @@ const MODULES = [
   {id:"MOD001",name:"筋力増幅回路",rarity:"COMMON",effects:[{stat:"STR",mode:"percent",value:10},{stat:"DEX",mode:"flat",value:-5}]},
   {id:"MOD002",name:"違法筋繊維",rarity:"COMMON",effects:[{stat:"STR",mode:"flat",value:5},{stat:"DEX",mode:"percent",value:-5}]}
 ];
-const RARITY_SLOTS={COMMON:0,UNCOMMON:1,RARE:2,EPIC:3,LEGENDARY:4};
+const RARITY_SLOTS={COMMON:1,UNCOMMON:2,RARE:3,EPIC:4,LEGENDARY:5};
 function canonicalRarity(value){return {コモン:"COMMON",アンコモン:"UNCOMMON",レア:"RARE",エピック:"EPIC",レジェンダリー:"LEGENDARY"}[value]||(Object.hasOwn(RARITY_SLOTS,value)?value:"COMMON");}
 function itemId(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;}
 function normalizeItem(item,rarity){
@@ -119,7 +119,18 @@ function generateLoot(enemy,rng=Math.random){
   return {type:"MODULE",item:createModuleInstance(candidates[Math.floor(rng()*candidates.length)].id)};
 }
 function installTargets(c){return [c.weapon,...c.memories,...c.inventory.memories].filter(Boolean);}
+function canModifyEquipment(c){return !(state.run?.ownerId===c.id&&state.run.phase==="combat");}
+function swapMemory(c,index,storageId){
+  if(!canModifyEquipment(c)||!Number.isInteger(index)||index<0||index>=4||c.memories.length!==4)return false;
+  const storedIndex=c.inventory.memories.findIndex(m=>m.instanceId===storageId);
+  if(storedIndex<0||!getMemDef(c.inventory.memories[storedIndex]))return false;
+  const equipped=c.memories[index],stored=c.inventory.memories[storedIndex];
+  if(c.memories.some(m=>m.instanceId===stored.instanceId))return false;
+  // Move complete instances: never rebuild from the MemoryDefinition.
+  c.memories[index]=stored;c.inventory.memories[storedIndex]=equipped;save();return true;
+}
 function installModule(c,moduleId,targetId){
+  if(!canModifyEquipment(c))return false;
   // Resolve again at commit time: stale confirmations cannot consume an instance twice.
   const index=c.inventory.modules.findIndex(m=>m.instanceId===moduleId),target=installTargets(c).find(i=>i.instanceId===targetId);
   if(index<0||!target||target.modules.length>=target.moduleSlots||!getModuleDef(c.inventory.modules[index]))return false;
@@ -163,6 +174,7 @@ function normalizeState(saved){
       c.weapon.weaponType??="LEGACY";normalizeItem(c.weapon,"COMMON");
     }
   });
+  if(saved.run?.loot?.type==="MEMORY")normalizeItem(saved.run.loot.item,getMemDef(saved.run.loot.item)?.rarity);
   saved.createDraft??=null;
   return saved;
 }
@@ -446,7 +458,7 @@ function renderMap(c){
             ${r.future.map((_,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" aria-label="次の候補：戦闘" aria-describedby="actionDescription">${nodeIcon}<span class="map-node-kind">戦闘</span></button>`).join("")}`;
         }).join("")}
       </div>
-      <button class="player-status player-health" id="playerDetails" aria-label="プレイヤーステータス詳細" aria-describedby="actionDescription">
+      <button class="player-status player-health" id="playerDetails" aria-label="キャラクター・装備管理" aria-describedby="actionDescription">
         <div class="battle-name">${esc(c.name)}</div>
         <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
         <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
@@ -469,7 +481,7 @@ function renderMap(c){
     bindActionHold(button,()=>`<b>次の候補</b><p>戦闘</p>`,()=>{});
   });
   bindActionHold(document.querySelector("#mapInfo"),()=>`<b>DEPTH ${state.run.depth}</b><p>${routes.map(r=>`戦闘 → ${r.future.map(()=>"戦闘").join(" / ")}`).join("<br>")}</p>`,()=>{});
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
   bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><p>威力 ${weaponPower(c)} / 命中 ${c.weapon.hit}% / ${weaponStatKey(c.weapon)} / ${c.weapon.hitCount||1} HIT</p>`,()=>{});
   document.querySelectorAll("[data-memory]").forEach(button=>{
     bindActionHold(button,()=>memoryDescription(c,c.memories[+button.dataset.memory]),()=>{});
@@ -522,7 +534,7 @@ function renderCombat(c){
       <div class="enemy-figure"><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="assets/${enemyArt}.svg" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
       <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
       <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}</div>
-      <button class="player-status player-health" id="playerDetails" aria-label="プレイヤーステータス詳細" aria-describedby="actionDescription">
+      <button class="player-status player-health" id="playerDetails" aria-label="キャラクター・装備管理" aria-describedby="actionDescription">
         <div class="battle-name">${esc(c.name)}</div>
         <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
         <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
@@ -542,7 +554,7 @@ function renderCombat(c){
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
-  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>openCharacterEquipment(c));
   bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${intent.damage?`${intent.damage} ダメージ`:"防御態勢"}</p>`,()=>{});
   scheduleCombatResolution(c);
 }
@@ -550,9 +562,13 @@ function renderCombat(c){
 function renderMemory(c,m,i,readOnly=false){
   return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${readOnly||!!state.run.combat?.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="${memoryIcon(m)}" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
+function memoryEffectText(c,m){
+  const d=getMemDef(m),val=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
+  return d.category==="回復"?`HPを ${val} 回復`:d.category==="防御"?`防壁 ${val} を得る`:`敵に ${val} ダメージ / 命中 ${d.hit}%`;
+}
 function memoryDescription(c,m){
-  const d=getMemDef(m), val=calcScaled(d.basePower,getEffectiveStats(c)[d.main]);
-  const effect=d.category==="回復"?`HPを ${val} 回復`:d.category==="防御"?`防壁 ${val} を得る`:`敵に ${val} ダメージ / 命中 ${d.hit}%`;
+  const d=getMemDef(m),effect=memoryEffectText(c,m);
+
   return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
 }
 // A held or cancelled gesture never activates an action on release.
@@ -747,26 +763,21 @@ function renderLoot(c){
 let inventoryCharacterId=null,inventoryTab="equipped";
 function renderInventory(){
   const owned=state.slots.filter(Boolean),c=owned.find(c=>c.id===inventoryCharacterId)||owned[0];inventoryCharacterId=c?.id;
-  el.innerHTML=`<section class="inventory-heading"><h2>INVENTORY</h2>${c?`<select id="inventoryCharacter" aria-label="キャラクター">${owned.map(x=>`<option value="${esc(x.id)}" ${x===c?"selected":""}>${esc(x.name)}</option>`).join("")}</select><p class="small">${statsDescription(c)}</p><div class="inventory-tabs">${[["equipped","EQUIPPED"],["memories","MEMORIES"],["modules","MODULES"]].map(([id,label])=>`<button data-inventory-tab="${id}" aria-pressed="${inventoryTab===id}">${label}</button>`).join("")}</div>`:""}</section><section class="inventory-list inventory-panel">${!c?"保有データなし。":inventoryTab==="equipped"?`<h3>EQUIPPED</h3><article class="inventory-item"><small>WEAPON</small>${equipmentSummary(c.weapon)}</article>${c.memories.map((m,i)=>`<article class="inventory-item"><small>MEMORY ${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></article>`).join("")}`:inventoryTab==="memories"?`<h3>STORAGE / MEMORIES</h3>${c.inventory.memories.map(m=>`<article class="inventory-item">${equipmentSummary(m)}</article>`).join("")||"所持メモリなし。"}`:`<h3>STORAGE / MODULES</h3>${c.inventory.modules.map(m=>`<button class="inventory-item module-choice" data-install-module="${esc(m.instanceId)}" ${getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}<small>インストール先を選択 ›</small></button>`).join("")||"未使用モジュールなし。"}`}</section><button class="btn ghost" data-nav="home">← HOME</button>`;
+  el.innerHTML=`<section class="inventory-heading"><h2>INVENTORY</h2>${c?`<select id="inventoryCharacter" aria-label="キャラクター">${owned.map(x=>`<option value="${esc(x.id)}" ${x===c?"selected":""}>${esc(x.name)}</option>`).join("")}</select><p class="small">${statsDescription(c)}</p><div class="inventory-tabs">${[["equipped","EQUIPPED"],["memories","MEMORIES"],["modules","MODULES"]].map(([id,label])=>`<button data-inventory-tab="${id}" aria-pressed="${inventoryTab===id}">${label}</button>`).join("")}</div>`:""}</section><section class="inventory-list inventory-panel">${!c?"保有データなし。":inventoryTab==="equipped"?equipmentList(c):inventoryTab==="memories"?`<h3>STORAGE / MEMORIES</h3>${c.inventory.memories.map(m=>`<article class="inventory-item">${equipmentSummary(m)}</article>`).join("")||"所持メモリなし。"}`:`<h3>STORAGE / MODULES</h3>${c.inventory.modules.map(m=>`<button class="inventory-item module-choice" data-install-module="${esc(m.instanceId)}" ${getModuleDef(m)&&canModifyEquipment(c)?"":"disabled"}>${moduleSummary(m)}<small>インストール先を選択 ›</small></button>`).join("")||"未使用モジュールなし。"}`}</section><button class="btn ghost" data-nav="home">← HOME</button>`;
   bindNav();
   el.querySelectorAll("[data-inventory-tab]").forEach(b=>b.onclick=()=>{inventoryTab=b.dataset.inventoryTab;renderInventory();});
+  el.querySelectorAll("[data-equipment]").forEach(b=>b.onclick=()=>openCharacterEquipment(c,b.dataset.equipment));
   const selector=el.querySelector("#inventoryCharacter");if(selector)selector.onchange=()=>{inventoryCharacterId=selector.value;renderInventory();};
   el.querySelectorAll("[data-install-module]").forEach(b=>b.onclick=()=>openModuleInstall(c,b.dataset.installModule));
 }
-function openModuleInstall(c,moduleId){
-  const module=c.inventory.modules.find(m=>m.instanceId===moduleId);if(!module)return;
-  const overlay=document.createElement("div");overlay.className="install-overlay";
-  overlay.innerHTML=`<section class="install-card" role="dialog" aria-modal="true" aria-labelledby="installTitle"><h3 id="installTitle">インストール先</h3><div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}" ${item.modules.length>=item.moduleSlots?"disabled":""}>${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div><button id="cancelInstall">CANCEL</button></section>`;
-  el.inert=true;document.body.appendChild(overlay);
-  const close=()=>{overlay.remove();el.inert=false;el.querySelector(`[data-install-module="${moduleId}"]`)?.focus();};
-  overlay.querySelector("#cancelInstall").onclick=close;
-  overlay.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>{
-    const targetId=b.dataset.installTarget,target=installTargets(c).find(i=>i.instanceId===targetId);
-    overlay.querySelector(".install-card").innerHTML=`<h3 id="installTitle">${esc(getModuleDef(module).name)}</h3><div>${moduleEffects(module)}</div><p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p><div class="install-actions"><button id="confirmInstall">INSTALL</button><button id="cancelInstall">CANCEL</button></div>`;
-    overlay.querySelector("#cancelInstall").onclick=close;
-    overlay.querySelector("#confirmInstall").onclick=()=>{if(installModule(c,moduleId,targetId)){close();renderInventory();}};
-    overlay.querySelector("#confirmInstall").focus();
-  });
+// Dialogs isolate the underlying run; combat timers keep their existing pacing.
+function equipmentDialog(className,title,onClose=()=>{}){
+  const parent=document.querySelector(".character-overlay"),previousInert=el.inert,parentInert=parent?.inert;
+  const opener=document.activeElement,overlay=document.createElement("div");overlay.className=`install-overlay ${className}`;
+  overlay.innerHTML=`<section class="install-card" role="dialog" aria-modal="true" aria-labelledby="equipmentDialogTitle"><h3 id="equipmentDialogTitle">${esc(title)}</h3><div class="equipment-dialog-body"></div><button class="equipment-dialog-close">戻る</button></section>`;
+  el.inert=true;if(parent)parent.inert=true;document.body.appendChild(overlay);
+  const close=()=>{overlay.remove();el.inert=previousInert;if(parent?.isConnected)parent.inert=parentInert;if(opener?.isConnected)opener.focus();onClose();};
+  overlay.querySelector(".equipment-dialog-close").onclick=close;
   overlay.onkeydown=e=>{
     if(e.key==="Escape"){e.preventDefault();close();}
     if(e.key==="Tab"){
@@ -774,7 +785,65 @@ function openModuleInstall(c,moduleId){
       if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
       else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
     }
-  };overlay.querySelector("button:not(:disabled)").focus();
+  };
+  return {overlay,body:overlay.querySelector(".equipment-dialog-body"),close};
+}
+function openModuleInstall(c,moduleId,{targetId=null,onDone=renderInventory}={}){
+  if(!canModifyEquipment(c))return;
+  const module=c.inventory.modules.find(m=>m.instanceId===moduleId);if(!module||!getModuleDef(module))return;
+  const {overlay,body,close}=equipmentDialog("module-install-overlay","インストール先");
+  body.innerHTML=`<div>${moduleSummary(module)}</div><div class="install-targets">${installTargets(c).map(item=>`<button data-install-target="${esc(item.instanceId)}" ${item.modules.length>=item.moduleSlots?"disabled":""}>${esc(itemName(item))}<small>${c.weapon===item?"WEAPON":c.memories.includes(item)?"EQUIPPED MEMORY":"STORAGE MEMORY"} · MODULE ${item.modules.length}/${item.moduleSlots}</small></button>`).join("")}</div>`;
+  const cancel=overlay.querySelector(".equipment-dialog-close");cancel.id="cancelInstall";cancel.textContent="CANCEL";
+  function confirmTarget(id){
+    const target=installTargets(c).find(i=>i.instanceId===id);
+    if(!target||target.modules.length>=target.moduleSlots||!canModifyEquipment(c))return;
+    overlay.querySelector("h3").textContent=getModuleDef(module).name;
+    body.innerHTML=`<div>${moduleEffects(module)}</div><p>${esc(itemName(target))}へインストールします。</p><p class="negative">※一度インストールしたモジュールは取り外せません。</p><button id="confirmInstall">INSTALL</button>`;
+    body.querySelector("#confirmInstall").onclick=()=>{if(installModule(c,moduleId,id)){close();onDone();}};
+    body.querySelector("#confirmInstall").focus();
+  }
+  body.querySelectorAll("[data-install-target]").forEach(b=>b.onclick=()=>confirmTarget(b.dataset.installTarget));
+  if(targetId)confirmTarget(targetId);else overlay.querySelector("button:not(:disabled)").focus();
+}
+function equipmentList(c){
+  return `<h3>EQUIPPED</h3><button class="inventory-item equipment-choice" data-equipment="${esc(c.weapon.instanceId)}"><small>WEAPON</small>${equipmentSummary(c.weapon)}<small>${esc(c.weapon.weaponType)} · POWER ${c.weapon.basePower} · MAIN ${weaponStatKey(c.weapon)} · HIT ${c.weapon.hit}% · ${c.weapon.hitCount||1} HIT</small></button>${c.memories.map((m,i)=>`<button class="inventory-item equipment-choice" data-equipment="${esc(m.instanceId)}"><small>MEMORY 0${i+1}</small>${equipmentSummary(m)}<small>CT ${m.currentCT}/${getMemDef(m).ct} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></button>`).join("")}`;
+}
+function moduleSlotControls(item,locked){
+  return `<p>MODULE ${item.modules.length} / ${item.moduleSlots}</p><div class="module-slot-grid" style="--slot-count:${item.moduleSlots}">${Array.from({length:item.moduleSlots},(_,i)=>item.modules[i]?`<span class="module-slot occupied" aria-label="${esc(getModuleDef(item.modules[i])?.name||"装着済みモジュール")}">■</span>`:`<button class="module-slot" data-empty-module-slot="${i}" aria-label="空きモジュールスロット${i+1}" ${locked?"disabled":""}>□</button>`).join("")}</div><div>${item.modules.map(m=>`<div class="installed-module">${moduleSummary(m)}</div>`).join("")||"装着モジュールなし。"}</div>`;
+}
+function openCharacterEquipment(c,initialItemId=null){
+  const combatView=!canModifyEquipment(c),{overlay,body,close}=equipmentDialog("character-overlay","CHARACTER / EQUIPMENT",()=>{if(state.screen==="inventory"){renderInventory();(el.querySelector(`[data-equipment="${initialItemId}"]`)||el.querySelector("[data-inventory-tab]"))?.focus();}else if(state.screen==="run"){render();el.querySelector("#playerDetails")?.focus();}});
+  let currentId=initialItemId;
+  const locked=()=>combatView||!canModifyEquipment(c);
+  function paint(){
+    const item=currentId?installTargets(c).find(i=>i.instanceId===currentId):null;
+    if(!item){
+      currentId=null;
+      body.innerHTML=`<div class="character-summary"><b>${esc(c.name)}</b><small>${esc(JOBS.find(j=>j.id===c.jobId)?.name||"職業未設定")}</small><p>HP ${c.hp} / ${c.maxHp}</p><p>${statsDescription(c)}</p>${locked()?`<p class="negative">戦闘中は詳細確認のみ可能です。</p>`:""}</div>${equipmentList(c)}`;
+      body.querySelectorAll("[data-equipment]").forEach(b=>b.onclick=()=>{currentId=b.dataset.equipment;paint();});
+    }else{
+      const memory=item!==c.weapon,d=memory?getMemDef(item):null,index=c.memories.indexOf(item);
+      body.innerHTML=`<button id="equipmentOverview">‹ CHARACTER</button><h4>${esc(itemName(item))}</h4><p>${esc(item.rarity)}${memory?` · ${esc(d.category)} · ${d.execution==="STANDARD"?"標準実行":"即時実行"} (${d.execution})`:` · ${esc(item.weaponType)}`}</p><p>POWER ${memory?d.basePower:item.basePower} · MAIN ${memory?d.main:weaponStatKey(item)}<br>HIT ${memory?d.hit:item.hit}%${memory?"":` · HIT COUNT ${item.hitCount||1}`}</p>${memory?`<p>CT ${item.currentCT} / ${d.ct}<br>破損率 ${item.breakageRate.toFixed(2)}% · ${item.broken?"BROKEN":"ACTIVE"}</p><p>${esc(d.description)}</p><div class="equipment-effect">現在の効果：${memoryEffectText(c,item)}</div>`:`<p>現在の威力 ${weaponPower(c)}</p>`}${moduleSlotControls(item,locked())}${memory&&index>=0?`<button id="changeMemory" ${locked()?"disabled":""}>CHANGE</button>`:""}${locked()?`<p class="negative">戦闘中は変更・インストールできません。</p>`:""}`;
+      body.querySelector("#equipmentOverview").onclick=()=>{currentId=null;paint();};
+      body.querySelectorAll("[data-empty-module-slot]").forEach(b=>b.onclick=()=>{if(!locked())openUnusedModules(item);});
+      const change=body.querySelector("#changeMemory");if(change)change.onclick=()=>{if(!locked())openMemoryChange(index,item.instanceId);};
+    }
+    body.scrollTop=0;overlay.querySelector("button:not(:disabled)").focus();
+  }
+  function openUnusedModules(item){
+    const dialog=equipmentDialog("module-picker-overlay","未使用MODULE");
+    dialog.body.innerHTML=c.inventory.modules.map(m=>`<button data-pick-module="${esc(m.instanceId)}" ${getModuleDef(m)?"":"disabled"}>${moduleSummary(m)}</button>`).join("")||"未使用モジュールなし。";
+    dialog.body.querySelectorAll("[data-pick-module]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickModule;dialog.close();if(!locked())openModuleInstall(c,id,{targetId:item.instanceId,onDone:paint});});
+    dialog.overlay.querySelector("button:not(:disabled)").focus();
+  }
+  function openMemoryChange(index,equippedId){
+    const dialog=equipmentDialog("memory-change-overlay","STORAGE MEMORY");
+    dialog.body.innerHTML=c.inventory.memories.map(m=>`<button data-swap-memory="${esc(m.instanceId)}">${equipmentSummary(m)}<small>CT ${m.currentCT}/${getMemDef(m).ct} · 破損率 ${m.breakageRate.toFixed(2)}% · ${m.broken?"BROKEN":"ACTIVE"}</small></button>`).join("")||"所持メモリなし。";
+    dialog.body.querySelectorAll("[data-swap-memory]").forEach(b=>b.onclick=()=>{
+      if(!locked()&&c.memories[index].instanceId===equippedId&&swapMemory(c,index,b.dataset.swapMemory)){currentId=c.memories[index].instanceId;dialog.close();paint();}
+    });dialog.overlay.querySelector("button:not(:disabled)").focus();
+  }
+  paint();
 }
 
 function renderPlaceholder(name){
