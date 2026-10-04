@@ -343,23 +343,37 @@ function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
   const busy=!!combat.pendingAction;
   const enemyArt={E01:"sentinel",E02:"hunter",E03:"monk"}[e.id]||"sentinel";
+  // All overlays share the complete 864 × 1536 artwork coordinate system.
   el.innerHTML=`
-  <section class="battle-scene">
-    <div class="battle-heading"><span class="kicker">DEPTH ${state.run.depth} / BATTLE</span><button class="btn ghost small" id="exitRun">HOME</button></div>
-    <div class="enemy-figure"><div class="kicker">${esc(e.name)}</div><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="assets/${enemyArt}.svg" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
-    <div class="enemy-health">${e.guard?`<span class="shield">GUARD ${e.guard}</span>`:""}<div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i><span class="hp-value">${e.hp}/${e.maxHp}</span></div></div>
-    <div class="intent">NEXT // ${esc(intent.label)} ${intent.damage?`【${intent.damage}】ダメージ`:"防御態勢"}</div>
-    <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
-    <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}<span class="kicker">${esc(c.name)}</span></div>
-    <div class="player-health">${state.run.shield?`<span class="shield">SHIELD ${state.run.shield}</span>`:""}<div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp}/${c.maxHp}</span></div><div class="battle-stats">${Object.entries(c.stats).map(([k,v])=>`<span>${k} ${v}</span>`).join("")}</div></div>
-  </section>
-  <section class="battle-controls" aria-label="行動選択">
-    <div id="actionDescription" class="action-description hidden" role="tooltip"></div>
-    <div class="action-icons">
-      <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-disabled="${busy}" aria-label="武器 ${esc(c.weapon.name)}" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""><span class="action-number">武器</span></button><span class="action-name">${esc(c.weapon.name)}</span><span class="action-wear">破損 ―</span></div>
-      ${c.memories.map((m,i)=>renderMemory(c,m,i)).join("")}
+  <section class="battle-viewport" aria-label="戦闘">
+    <div class="battle-canvas battle-scene">
+      <img class="battle-background" src="assets/battle-stage.webp" alt="" aria-hidden="true" width="864" height="1536">
+      <div class="enemy-status enemy-health">
+        <div class="battle-name">${esc(e.name)}</div>
+        <div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i><span class="hp-value">${e.hp} / ${e.maxHp}</span></div>
+        <div class="battle-status-note">${e.guard?`GUARD ${e.guard} · `:""}DEPTH ${state.run.depth}</div>
+      </div>
+      <button class="enemy-intent" id="enemyIntent" aria-label="次の行動：${esc(intent.label)}${intent.damage?`、${intent.damage}ダメージ`:"、防御態勢"}" aria-describedby="actionDescription">
+        <svg viewBox="0 0 32 32" aria-hidden="true">${intent.kind==="GUARD"?`<path d="M16 3 27 8v10c0 6-11 11-11 11S5 24 5 18V8Z"/>`:`<path d="m7 25 18-18 3-3v7L12 27M4 20l8 8M5 27l3-3"/>${intent.kind==="HEAVY"?`<path d="M6 4v8M2 8h8"/>`:""}`}</svg>
+        <span>${esc(intent.label)}${intent.damage?` ${intent.damage}`:""}</span>
+      </button>
+      <button class="battle-menu" id="exitRun" aria-label="ホームへ戻る"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M5 16h22M5 24h22"/></svg></button>
+      <div class="enemy-figure"><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="assets/${enemyArt}.svg" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
+      <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
+      <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}</div>
+      <button class="player-status player-health" id="playerDetails" aria-label="プレイヤーステータス詳細" aria-describedby="actionDescription">
+        <div class="battle-name">${esc(c.name)}</div>
+        <div class="hpbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i><span class="hp-value">${c.hp} / ${c.maxHp}</span></div>
+        <div class="battle-status-note">${state.run.shield?`SHIELD ${state.run.shield}`:""}</div>
+      </button>
+      <section class="battle-controls" aria-label="行動選択">
+        <div id="actionDescription" class="action-description hidden" role="tooltip"></div>
+        <div class="action-icons">
+          <div class="action-cell"><button class="action-icon weapon-icon" id="weaponBtn" aria-disabled="${busy}" aria-label="武器 ${esc(c.weapon.name)}" aria-describedby="actionDescription"><img src="assets/action-weapon.svg" alt=""></button><span class="action-name">${esc(c.weapon.name)}</span></div>
+          ${c.memories.map((m,i)=>renderMemory(c,m,i)).join("")}
+        </div>
+      </section>
     </div>
-    <div class="hold-hint">タップ：実行 / 長押し：詳細</div>
   </section>`;
   document.querySelector("#exitRun").onclick=()=>{state.screen="home";save();render();};
   bindActionHold(document.querySelector("#weaponBtn"),()=>`<b>${esc(c.weapon.name)}</b><span class="tag std">標準実行</span><p>敵に ${calcScaled(c.weapon.basePower,c.stats.STR)} ダメージ / 命中 ${c.weapon.hit}%</p><p>使用するとターン終了。</p><p class="muted">${c.weapon.basePower} × (1 + √STR × 0.12)</p>`,()=>useWeapon(c));
@@ -367,11 +381,13 @@ function renderCombat(c){
     const i=+button.dataset.memory, m=c.memories[i], d=getMemDef(m);
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
+  bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${Object.entries(c.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}</p><p>HP ${c.hp} / ${c.maxHp} · SHIELD ${state.run.shield}</p>`,()=>{});
+  bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${intent.damage?`${intent.damage} ダメージ`:"防御態勢"}</p>`,()=>{});
   scheduleCombatResolution(c);
 }
 
 function renderMemory(c,m,i){
-  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${!!state.run.combat.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt=""><span class="action-number">${i+1}</span>${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span><span class="action-wear">破損 ${m.breakageRate.toFixed(2)}%</span></div>`;
+  return `<div class="action-cell"><button class="action-icon memory ${m.broken?"broken":""}" data-memory="${i}" aria-label="メモリ${i+1} ${esc(getMemDef(m).name)}" aria-disabled="${!!state.run.combat.pendingAction||m.currentCT>0||m.broken}" aria-describedby="actionDescription"><img src="assets/action-${i+1}.svg" alt="">${m.broken?`<span class="action-ct">×</span>`:m.currentCT?`<span class="action-ct">${m.currentCT}</span>`:""}</button><span class="action-name">${esc(getMemDef(m).name)}</span></div>`;
 }
 function memoryDescription(c,m){
   const d=getMemDef(m), val=calcScaled(d.basePower,c.stats[d.main]);
@@ -471,7 +487,7 @@ function useMemory(c,index){
 
 function damagePopup(combat,target){
   const f=combat.feedback;
-  return f?.target===target?`<span class="damage-popup" role="status" aria-label="${f.value} ダメージ">${f.value}</span>`:"";
+  return f?.target===target?`<span class="damage-popup" role="status" aria-label="${f.value} ダメージ">−${f.value}</span>`:"";
 }
 function finishPlayerAction(c,endsTurn){
   state.run.combat.pendingAction={stage:"player",endsTurn};

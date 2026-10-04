@@ -46,15 +46,12 @@ button{color:inherit}
 .route .enemy{font-weight:800;font-size:18px;margin:8px 0}
 .future{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
 .future span{border:1px dashed #263a42;padding:7px;font-size:10px;color:#93a4a9}
-.intent{border:1px solid #62333a;background:#1a0d11;padding:10px;color:#ffc2c7}
+
 .combat-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
 .tag{display:inline-block;border:1px solid var(--line);padding:2px 5px;font-size:10px;margin-right:4px}
 .tag.std{color:var(--amber);border-color:#665a32}
 .tag.inst{color:var(--cyan);border-color:#2a5960}
 .tag.bad{color:var(--red);border-color:#63313a}
-.memory{position:relative}
-.memory.broken{border-color:#6e303a;background:#190b0e}
-.memrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .formula{font-size:10px;color:#8fb1b7;margin-top:5px;word-break:break-word}
 .log{height:150px;overflow:auto;background:#05090b;border:1px solid #18272d;padding:8px;font-size:11px;line-height:1.55}
 .log div{margin-bottom:3px}
@@ -73,7 +70,6 @@ input[type="text"]{width:100%;border:1px solid var(--line);background:#050a0d;co
   .grid3{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(4,1fr)}
   .stat{padding:6px 3px}.stat b{font-size:16px}
-  .memrow{grid-template-columns:1fr}
   .screen-title{font-size:22px}
 }
 
@@ -101,52 +97,17 @@ p{margin:8px 0}.screen-title{font-size:24px;margin:6px 0}.kicker{font-size:10px;
 .slot{min-height:82px}.slot .name{font-size:17px;margin:3px 0}#app[data-screen="play"]>.grid{flex:1;grid-template-rows:repeat(3,1fr);min-height:0}.slot .meta{font-size:11px}
 .stats{gap:5px}.stat{padding:4px;font-size:10px;background:#0b0b0c}.stat b{font-size:15px}.hpbar{height:7px;margin-top:4px}.combat-head{gap:5px}.combat-head h3{font-size:16px}.shield{font-size:11px}
 .route{display:block;width:100%;min-height:0;padding:10px;text-align:left;background:#121214;border-color:#555158}.route .enemy{font-size:16px;margin:8px 0}.future{grid-template-columns:1fr;gap:5px;margin-top:10px}.future span{padding:6px;font-size:11px}.route .side{color:var(--green)}
-#app[data-screen="map"]>.map-panel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(#090909ed,#090909e8),url('assets/cyber_shrine.svg') center/cover}.map-panel>.grid{margin-top:8px}
-#app[data-screen="combat"]{gap:6px}.enemy-panel{order:1;position:relative;padding-right:64px}.enemy-panel:after{content:'';position:absolute;right:8px;top:12px;width:48px;height:48px;background:url('assets/sentinel.svg') center/contain no-repeat;image-rendering:pixelated}.enemy-panel h2{font-size:17px}.intent{font-size:14px;font-weight:700;margin-top:7px!important;padding:7px;color:#ffd9dc;border-color:#92515a;background:#211013;box-shadow:2px 2px 0 #08020b}
-#app[data-screen="combat"]>.player-panel{order:2;padding:8px}.player-panel .stats{margin-top:5px!important}
-.actions-panel{order:3;padding:8px}.actions-panel h3{font-size:11px;color:var(--muted);margin:4px 0!important}.actions-panel>.kicker{display:none}.actions-panel #weaponBtn{padding:8px;min-height:57px}.formula{display:none}
-.memrow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.memory{padding:8px;min-height:105px}.memory .tag{font-size:10px;padding:1px 4px}.memory .title{display:block;font-size:15px;margin:3px 0}.memory .meta{font-size:11px;line-height:1.4}.memory-status{display:flex;justify-content:space-between;gap:2px;margin-top:4px;color:var(--cyan);font-weight:700;font-size:11px}.memory-status .wear{color:#d6b7bd}.memory.broken .title{color:var(--red)}
-.combat-log{order:4;flex:1;min-height:28px;display:flex;flex-direction:column;padding:6px 8px}.combat-log .kicker{font-size:9px}.log{height:auto;min-height:0;flex:1;overflow:hidden;padding:3px 0;border:0;background:transparent;font-size:11px;line-height:1.4;display:flex;flex-direction:column;justify-content:flex-end}.log div{flex:none;margin:0}.log .sys{color:#a1c7cf}
-#app[data-screen="combat"]>.footer{order:5;margin-top:0}.modal{padding:12px}.modal-card{max-width:406px;padding:16px}input[type="text"]{font-size:16px;border-radius:0}
+#app[data-screen="map"]>.map-panel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(#090909ed,#090909e8),url('assets/cyber_shrine.svg') center/cover}.map-panel>.grid{margin-top:8px}.player-panel .stats{margin-top:5px!important}.formula{display:none}.log{height:auto;min-height:0;flex:1;overflow:hidden;padding:3px 0;border:0;background:transparent;font-size:11px;line-height:1.4;display:flex;flex-direction:column;justify-content:flex-end}.log div{flex:none;margin:0}.log .sys{color:#a1c7cf}.modal{padding:12px}.modal-card{max-width:406px;padding:16px}input[type="text"]{font-size:16px;border-radius:0}
 .inventory-panel{padding:8px}.inventory-panel .small{padding:5px 0!important;font-size:11px}.inventory-panel h3{font-size:14px}#app[data-screen="inventory"]>.inventory-panel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
 .splash{position:fixed;inset:0;z-index:100;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px;opacity:1;transition:opacity .45s ease;padding:24px;cursor:pointer}.splash img{width:min(72vw,300px);max-height:65dvh;object-fit:contain}.splash span{color:#adcfb8;font:10px monospace;letter-spacing:.25em}.splash.leaving{opacity:0;pointer-events:none}
 @media(min-width:600px){#app{border-inline:1px solid #38383d;box-shadow:0 0 50px #10242d}}
-@media(max-height:700px){#app{gap:6px;padding-left:10px;padding-right:10px}.home-hero{min-height:115px}.menu .btn{min-height:55px;padding:8px}.menu .primary{min-height:61px}.panel{padding:8px}.memory{min-height:96px;padding:6px}.enemy-panel{padding-right:62px}.enemy-panel .kicker{font-size:9px}.actions-panel #weaponBtn{min-height:52px;padding:6px}.player-panel .stat{padding:2px}.combat-log{padding:5px 7px}.footer{font-size:8px}.topline{height:28px}.slot{min-height:76px}}
+@media(max-height:700px){#app{gap:6px;padding-left:10px;padding-right:10px}.home-hero{min-height:115px}.menu .btn{min-height:55px;padding:8px}.menu .primary{min-height:61px}.panel{padding:8px}.player-panel .stat{padding:2px}.footer{font-size:8px}.topline{height:28px}.slot{min-height:76px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-/* Keep the 640px terminal readable without pushing the message area offscreen. */
-.memory .title{display:inline;margin:0;font-size:14px}
-#app[data-screen="combat"] .player-panel #exitRun{min-height:32px}
-#app[data-screen="combat"] .player-panel .stat b{display:inline;margin-left:5px;font-size:13px}
-#app[data-screen="combat"] .player-panel .stat{padding:3px}
-.enemy-panel{padding-right:8px}
-.enemy-panel h2{padding-right:55px}
-.enemy-panel .intent{padding-right:5px}
-@media(max-height:700px){.memory{min-height:82px}.actions-panel h3{margin:3px 0!important}.memory .meta{line-height:1.3}.memory-status{margin-top:3px}}
+
 
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
 .brand,.screen-title,.panel h2,.slot .name,.route .enemy{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
-/* Battle stage: enemy above, body below, five square actions at the foot. */
-#app[data-screen="combat"]{gap:8px}
-.battle-scene{position:relative;flex:1;min-height:0;overflow:hidden;border:1px solid #454249;background:linear-gradient(180deg,#080808a8,#080808e0),url('assets/cyber_shrine.svg') center/cover no-repeat}
-.battle-heading{position:absolute;inset:8px 8px auto;display:flex;align-items:center;justify-content:space-between}
-.battle-heading .btn{width:auto;padding:6px;min-height:32px;font-size:11px}
-.enemy-figure{position:absolute;top:14%;left:36%;width:39%;text-align:center}
-.enemy-figure img{display:block;width:100%;height:clamp(80px,18dvh,155px);object-fit:contain;image-rendering:pixelated;filter:drop-shadow(3px 5px 0 #0008)}
-.enemy-figure .kicker{display:block;color:#ded6d8;font-size:14px;margin-bottom:6px}
-.enemy-health{position:absolute;top:45%;right:12px;width:48%;text-align:right;font-size:14px}
-.enemy-health .shield{display:block}.enemy-health .hpbar{margin-left:auto}
-.battle-scene .intent{position:absolute;top:55%;left:8px;right:8px;font-size:13px;margin:0!important;padding:7px}
-.battle-message{position:absolute;top:65%;left:8px;right:8px;font-size:11px;color:#abc7d1;text-align:right;line-height:1.5}.battle-message .good{color:var(--green)}.battle-message .bad{color:#f3aeb5}.battle-message .sys{color:var(--cyan)}
-.player-figure{position:absolute;left:12px;bottom:17%;width:29%;text-align:center}
-.player-figure img{display:block;width:100%;height:clamp(80px,17dvh,145px);object-fit:contain;image-rendering:pixelated;filter:drop-shadow(3px 5px 0 #0008)}
-.player-figure .kicker{display:block;font-size:12px;overflow-wrap:anywhere}
-.player-health{position:absolute;left:12px;bottom:10px;right:12px;font-size:17px}.player-health .shield{margin-left:8px}.player-health .hpbar{max-width:230px;height:8px;margin:6px 0}.battle-stats{display:flex;gap:14px;font-size:11px;color:#abc1cc}
-.battle-controls{position:relative;flex:none;padding:8px 0 0}.action-icons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
-.action-cell{min-width:0;text-align:center}.action-icon{position:relative;display:block;width:100%;aspect-ratio:1;padding:0;min-height:0;overflow:hidden;background:#151517;border:1px solid #55515a;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;color:var(--text);cursor:pointer}
-.action-icon img{display:block;width:100%;height:100%;image-rendering:pixelated;pointer-events:none}.action-icon:active{border-color:var(--green);background:#212728}.action-icon[aria-disabled="true"]{border-color:#414b60;background:#101012}.action-icon[aria-disabled="true"] img{opacity:.45}.action-icon.broken{border-color:#ab5677}.action-icon.weapon-icon{border-color:var(--cyan)}
-.action-number{position:absolute;top:2px;left:3px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;font-size:14px;background:#080808ef;padding:1px 3px}.action-ct{position:absolute;bottom:2px;right:3px;background:#080808f5;color:#f2c887;padding:0 3px;font-size:16px}.action-state,.action-wear{display:block;white-space:nowrap;font-size:10px;line-height:1.5;margin-top:3px}.action-state{color:var(--cyan)}.action-wear{color:#d6b7bd;margin-top:0}.hold-hint{color:#a3b7c0;text-align:center;font-size:11px;margin-top:6px}
-.action-description{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:10;padding:12px;background:#101012fa;border:1px solid var(--cyan);box-shadow:3px 3px 0 #0009;pointer-events:none;font-size:13px;line-height:1.5}.action-description b{font-size:18px;margin-right:8px;color:#f1f9f1}.action-description p{margin:5px 0}.action-description .tag{font-size:11px}
-@media(max-height:700px){.battle-scene .intent{top:52%}.battle-message{top:62%;font-size:10px}.player-figure{bottom:18%}.player-figure img{height:80px}.enemy-figure img{height:86px}.enemy-health{top:43%}.action-description{font-size:12px;padding:10px}}
+
 
 /* Readable system typography over a black, restrained horror-cyberpunk palette. */
 :root{--bg:#050505;--panel:#101011;--panel2:#171719;--line:#444149;--text:#f0edee;--muted:#b0aab1;--cyan:#a3cece;--red:#ed8f98;--amber:#d8c39a;--green:#adcfb8;--purple:#bd9eae}
@@ -155,11 +116,7 @@ body{line-height:1.4}
 #app:before{opacity:.045;background:repeating-linear-gradient(0deg,transparent 0 3px,#c5bdc0 3px 4px),repeating-linear-gradient(90deg,transparent 0 31px,#92515a 31px 32px)}
 .brand{color:#e9dadd;text-shadow:none;letter-spacing:.14em}
 .home-hero{background:linear-gradient(0deg,#090909f5,transparent 90%),url('assets/cyber_shrine.svg') center top/cover no-repeat}
-.intent{color:#ffdade;border-color:#92515a;background:#211013}
-.battle-message,.battle-stats,.hold-hint{color:#c2bcc3}
-.action-number{font-size:12px;font-weight:700}
-.action-state,.action-wear{font-size:11px;letter-spacing:-.02em}
-.action-icon img,.enemy-figure img,.player-figure img{image-rendering:auto;object-fit:contain}
+
 .splash span{font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted)}
 
 /* The home menu sits on a rotating vertical cylinder over the supplied city artwork. */
@@ -191,26 +148,57 @@ body{line-height:1.4}
 @media(max-height:700px){.home-selector{--drum-radius:105px;margin-bottom:0}.drum-stage{height:264px}.home-intro{padding-top:16px}.drum-item{height:76px;top:calc(50% - 38px)}.drum-title{font-size:22px}.drum-focus{height:86px;top:calc(50% - 43px)}}
 @media(prefers-reduced-motion:reduce){.menu-drum{transition:none}}
 
-/* Give combat the full portrait area on a plain black stage. */
-body:has(#app[data-screen="combat"]){background:#000}
-#app[data-screen="combat"]{background:#000;border:0;box-shadow:none;padding:env(safe-area-inset-top) max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}
-#app[data-screen="combat"]:before{display:none}
-#app[data-screen="combat"] .battle-scene{background:#000;border:0;box-shadow:none}
 
-/* Action names, centered cooldown counts and numeric life bars. */
-.action-name{display:block;min-height:32px;margin-top:5px;font-size:11px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;color:var(--text)}
-.action-ct{inset:0;display:flex;align-items:center;justify-content:center;background:#0005;font-size:26px;font-weight:700;color:#fff;text-shadow:0 2px 5px #000;padding:0}
-.action-icon[aria-disabled="true"] img{opacity:.3}
-.enemy-health .hpbar,.player-health .hpbar{position:relative;height:24px;margin:0;width:100%;max-width:none;background:#391319;border:1px solid #77313b}
-.hp-value{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;text-shadow:0 1px 3px #000}
-.enemy-health{top:41%;width:48%}.enemy-health .shield{margin-bottom:4px}
-.player-health{left:auto;right:12px;bottom:12px;width:52%;font-size:13px;text-align:right}
-.player-health .shield{display:block;margin:0 0 5px}.battle-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:5px 12px;margin-top:8px;font-size:12px;text-align:right}
-.player-figure{left:0;bottom:12px;width:43%}.player-figure img{height:clamp(140px,27dvh,245px)}
-.battle-message{left:auto;right:12px;width:53%;top:64%}.battle-scene .intent{top:51%}
-.damage-popup{position:absolute;top:20px;left:50%;z-index:4;color:#fff;font-size:30px;font-weight:800;text-shadow:2px 2px #851927,-2px -2px #000;pointer-events:none;animation:damage-rise .72s ease-out both}
+
+
+
+@font-face{font-family:"NEHAN Battle Pixel";src:url("assets/misaki-gothic.woff") format("woff");font-display:swap}
+
+/* Battle only: percentages are calibrated to the full 864 × 1536 image.
+   Frames belong to the artwork; overlays never draw replacement frames. */
+body:has(#app[data-screen="combat"]){background:#000}
+#app[data-screen="combat"]{padding:0;gap:0;background:#000;border:0;box-shadow:none}
+#app[data-screen="combat"]:before{display:none}
+.battle-viewport{--combat-safe-top:env(safe-area-inset-top);--combat-safe-bottom:env(safe-area-inset-bottom);width:100%;height:100%;min-height:0;display:grid;place-items:center;padding:var(--combat-safe-top) env(safe-area-inset-right) var(--combat-safe-bottom) env(safe-area-inset-left);overflow:hidden}
+.battle-canvas{position:relative;isolation:isolate;container-type:inline-size;width:min(100%,calc((100dvh - var(--combat-safe-top) - var(--combat-safe-bottom))*9/16));aspect-ratio:9/16;flex:none;overflow:hidden;background:#000;border:0;color:#eee9e9;line-height:1.3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,"NEHAN Battle Pixel",sans-serif}
+.battle-background{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:-1}
+.enemy-status,.player-status{position:absolute;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:1cqw;padding:1.6cqw 2cqw;overflow:hidden}
+.enemy-status{left:2.8935%;top:13.6719%;width:41.7824%;height:8.7891%}
+.player-status{left:57.8704%;top:69.987%;width:39.9306%;height:9.4401%;gap:.55cqw;border:0;background:transparent;text-align:left;min-height:0;touch-action:none;-webkit-touch-callout:none}
+.battle-name{font-size:3.3cqw;font-weight:700;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.battle-canvas .hpbar{position:relative;flex:none;height:4.8cqw;width:100%;margin:0;background:#080606;border:1px solid #763c40;overflow:hidden}
+.battle-canvas .hpbar>i{background:#9e2631}
+.hp-value{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:3cqw;font-weight:700;text-shadow:0 1px 2px #000}
+.battle-status-note{font-size:2.7cqw;color:#cebdbe;min-height:0;line-height:1.1}
+.battle-status-note:empty{display:none}
+
+.enemy-intent,.battle-menu{position:absolute;top:2.9297%;height:7.487%;padding:1.4cqw;min-height:0;border:0;background:transparent;color:#e8e1e1;cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.5cqw}
+.enemy-intent{left:67.1296%;width:13.8889%;touch-action:none;-webkit-touch-callout:none;user-select:none}
+.battle-menu{left:82.4074%;width:14.0046%}
+.enemy-intent svg,.battle-menu svg{width:7cqw;height:7cqw;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.enemy-intent span{font-size:2.4cqw;line-height:1;color:#d8babe;white-space:nowrap}
+.enemy-figure,.player-figure{position:absolute;pointer-events:none;z-index:1}
+.enemy-figure{left:40%;top:23%;width:52%;height:38%}
+.player-figure{left:0;top:51%;width:57%;height:31%}
+.enemy-figure img,.player-figure img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}
+.enemy-figure img{object-position:center bottom}
+.player-figure img{object-position:left bottom}
+.battle-message{position:absolute;left:4%;top:49%;width:42%;max-height:8%;z-index:2;overflow:hidden;color:#e1d9d9;font-size:2.7cqw;text-shadow:0 1px 3px #000;pointer-events:none}
+.battle-message div{line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.battle-message .good,.battle-message .sys{color:#e1d9d9}.battle-message .bad{color:#e0a5ac}
+.battle-controls{position:absolute;left:0;top:82.2266%;width:100%;height:9.375%;z-index:3}
+.action-icons{position:absolute;inset:0}
+.action-cell{position:absolute;top:0;width:17.94%;height:100%;text-align:center;min-width:0}
+.action-cell:nth-child(1){left:2.0833%}.action-cell:nth-child(2){left:21.7593%}.action-cell:nth-child(3){left:41.3194%}.action-cell:nth-child(4){left:60.8796%}.action-cell:nth-child(5){left:80.3241%}
+.action-icon{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:85%;aspect-ratio:1;min-height:0;padding:0;overflow:hidden;border:0;background:transparent;color:#fff;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.action-icon img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.action-icon[aria-disabled="true"] img{opacity:.3}.action-icon.broken img{filter:grayscale(1)}
+.action-name{position:absolute;top:calc(100% + 1cqw);left:-1%;width:102%;font-size:2.8cqw;font-weight:600;line-height:1.3;color:#eee9e9;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.action-ct{position:absolute;inset:0;display:grid;place-items:center;background:#0004;color:#fff;font-size:7cqw;font-weight:700;text-shadow:0 2px 3px #000;pointer-events:none}
+.action-description{position:absolute;left:3%;right:3%;bottom:calc(100% + 2cqw);z-index:10;background:#080607ed;border:0;box-shadow:none;padding:2.5cqw;color:#eee9e9;pointer-events:none;font-size:2.8cqw;line-height:1.35}
+.action-description b{font-size:3.5cqw;margin-right:2cqw}.action-description p{margin:1cqw 0}.action-description .tag{font-size:2.5cqw;background:transparent;color:#d7c7c7;border:0;padding:0}.action-description .muted{color:#b7acad}
+.damage-popup{position:absolute;top:20%;left:50%;z-index:4;color:#fff;font-size:8cqw;font-weight:800;text-shadow:2px 2px #851927,-1px -1px #000;pointer-events:none;animation:damage-rise .72s ease-out both}
 .damage-flash{animation:damage-blink .6s steps(1,end)}
 @keyframes damage-rise{0%{transform:translate(-50%,10px);opacity:1}65%{opacity:1}100%{transform:translate(-50%,-35px);opacity:0}}
 @keyframes damage-blink{0%,40%,80%{opacity:.2}20%,60%,100%{opacity:1}}
-@media(max-height:700px){.player-figure img{height:145px}.player-figure{bottom:12px}.battle-message{top:63%;font-size:10px}.battle-scene .intent{top:50%}.action-name{font-size:10px}.battle-stats{font-size:11px;gap:4px 8px}}
 @media(prefers-reduced-motion:reduce){.damage-flash{animation:none}.damage-popup{animation:none;transform:translateX(-50%)}}
