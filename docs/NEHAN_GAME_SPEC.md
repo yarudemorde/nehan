@@ -50,7 +50,7 @@ The central combat identity is:
 
 - The player should make meaningful decisions from a very small combat loadout.
 - Memories are persistent executable techniques/data, not shuffled cards.
-- Repeated Memory use creates long-term risk through breakage probability.
+- Repeated Memory use creates cumulative wear through repeated use.
 - Death removes the current character.
 - Some progress survives through recovered Memories and persistent rewards.
 - There is no character level system.
@@ -398,44 +398,31 @@ next player turn -> 1
 next player turn -> 0 (usable)
 ```
 
-## 6.5 Breakage / corruption model — CONFIRMED
+## 6.5 Breakage / corruption model — CONFIRMED (2026-10-05)
 
-There is **no durability value** and **no fixed Memory-specific deterioration value**.
+`breakageRate` is cumulative wear from 0 to 100, not a failure probability.
+There is no Memory-specific fixed deterioration value.
 
-Each Memory instance has a current **破損率 (breakage probability)**.
+On each valid Memory use:
 
-On every Memory use:
+1. resolve the effect normally (including the existing hit check for attacks)
+2. set the existing CT
+3. add a random **0.0 to 3.0 percentage points** to `breakageRate`, capped at 100
+4. if the result is 100, set `broken=true`; future uses are prohibited
 
-1. perform a breakage check using the Memory's **current breakage probability**
-2. after the breakage check, increase that Memory's breakage probability by a random **0.0% to 0.5%**
+There is no random breakage check. The use that reaches 100 still resolves before
+wear is applied. A miss is still a use and accumulates wear. Attempts while cooling,
+broken, or while an action is pending do not accumulate wear or consume a turn.
+Both Standard and Immediate Execution use the same wear range. Stored wear uses
+precision matching the UI (two decimal places).
 
-Exact confirmed order:
+## 6.6 Broken Memory behavior — CONFIRMED
 
-```text
-破損判定 -> 破損率上昇
-```
-
-The random breakage-probability increase is common to both Standard and Immediate Execution Memories.
-
-There is no automatic additional fixed deterioration penalty for Immediate Execution.
-
-## 6.6 Broken Memory behavior — CONFIRMED AT HIGH LEVEL
-
-When a Memory breaks:
-
-- the Memory remains as an item/data object
-- it is not automatically deleted
-- its combat effect becomes weakened to the point that it is almost unusable
-
-### UNRESOLVED
-
-- Exact broken effect per Memory.
-- Whether every Memory has a bespoke broken effect or uses a common transformation.
-- Repair availability and repair cost.
-- Whether breakage probability can be lowered.
-- Exact ordering of `effect resolution` relative to the breakage result on the use that triggers breakage.
-
-For implementation, keep these steps separable and configurable.
+- A broken Memory remains as an item with its installed Modules and instance data.
+- It cannot be executed. Long-press inspection and Storage movement remain available.
+- Loading preserves legacy wear and already-broken states; it does not repair them.
+- A saved Memory at 100% is marked broken even if an old save omitted the flag.
+- Repair availability/cost and future wear-reduction effects remain unresolved.
 
 ## 6.7 Memory effect display — CONFIRMED
 
@@ -545,7 +532,7 @@ Not yet decided:
 - Module rarity structure
 - exact stat value ranges
 - whether Modules can modify CT
-- whether Modules can modify breakage-probability increase
+- whether Modules can modify cumulative-wear increase
 - whether Modules can alter execution type
 
 Do not hard-code assumptions here.
@@ -608,10 +595,10 @@ A recovered Memory keeps its instance state.
 The recovered Memory carries forward:
 
 - Memory identity
-- current breakage probability
+- current cumulative breakage rate
 - installed Modules
 
-Recovery does **not** reset breakage probability.
+Recovery does **not** reset cumulative breakage rate.
 
 Conceptually, treat this as one persistent Memory instance object rather than generating a fresh copy from the base Memory definition.
 
@@ -723,7 +710,7 @@ RunState
 ProfileState
 ```
 
-This distinction is especially important because a Memory's breakage probability and installed Modules survive across characters when recovered.
+This distinction is especially important because a Memory's cumulative breakage rate and installed Modules survive across characters when recovered.
 
 ## 12.2 Suggested Memory definition fields
 
@@ -804,17 +791,14 @@ function beginPlayerTurn() {
 }
 
 function useMemory(memory) {
-  if (memory.currentCT > 0) return invalidAction();
+  if (memory.currentCT > 0 || memory.broken || memory.breakageRate >= 100) return invalidAction();
 
-  // CONFIRMED ORDER:
-  const didBreak = rollBreakage(memory.breakageRate);
-
-  // TODO(要確認): exact ordering between break result and effect resolution.
-  resolveMemoryEffect(memory, { didBreak });
+  resolveMemoryEffect(memory);
 
   memory.currentCT = memory.definition.ct;
 
-  memory.breakageRate += randomRange(0.0, 0.5); // percentage points
+  memory.breakageRate = Math.min(100, memory.breakageRate + randomRange(0.0, 3.0));
+  if (memory.breakageRate >= 100) memory.broken = true;
 
   if (memory.definition.executionType === "STANDARD") {
     endPlayerTurn();
@@ -840,7 +824,7 @@ function endPlayerTurn() {
 
 ### Implementation warning
 
-The `randomRange(0.0, 0.5)` statement means a **0.0 to 0.5 percentage-point** increase to breakage probability per use, not multiplication by 0.0–0.5.
+The `randomRange(0.0, 3.0)` statement means a **0.0 to 3.0 percentage-point** increase to cumulative breakage rate per use, not multiplication by 0.0–3.0.
 
 Choose and document numerical representation consistently, e.g.:
 
@@ -881,7 +865,7 @@ HOME
  |          Progress reward granted
  |          Memory recovery occurs
  |          recovered Memory retains:
- |            - breakage probability
+ |            - cumulative breakage rate
  |            - installed Modules
  |
  +-- INVENTORY
@@ -906,13 +890,13 @@ The following rules must not be changed incidentally during implementation:
 7. **即時実行 does not end the turn and can chain without a separate fixed count cap.**
 8. **Combat begins with the player.**
 9. **Enemy next action is displayed.**
-10. **Memory uses breakage probability, not durability.**
+10. **Memory tracks cumulative breakage rate from 0 to 100, not a failure probability.**
 11. **No Memory-specific fixed deterioration value.**
-12. **Each Memory use increases breakage probability by a random 0.0–0.5 percentage points.**
-13. **Breakage check happens before the probability increase.**
-14. **Broken Memories remain but become nearly unusable.**
+12. **Each Memory use increases cumulative breakage rate by a random 0.0–3.0 percentage points.**
+13. **Resolve the effect, then accumulate wear; reaching 100 makes future uses unavailable.**
+14. **Broken Memories remain but cannot be executed.**
 15. **A dead character is lost.**
-16. **Recovered Memory retains breakage probability.**
+16. **Recovered Memory retains cumulative breakage rate.**
 17. **Recovered Memory retains installed Modules.**
 18. **Use the term Module / モジュール, not チップ.**
 19. **The game is not a shuffle/deck-draw card game.**
@@ -930,15 +914,13 @@ These should remain visible in issues/code comments/spec tasks rather than being
 - Exact weapon damage formula.
 - Defense/evasion resolution.
 - Enemy damage formula.
-- Exact effect-resolution order when a Memory breaks on the current use.
 - Hit-rate global conventions.
 
 ## Memory
 
 - Secondary-stat correction formula.
-- Broken-effect model.
 - Repair system.
-- Whether breakage probability can decrease.
+- Whether cumulative breakage rate can decrease.
 - Full Memory catalog.
 
 ## Module
@@ -988,7 +970,7 @@ This is an implementation recommendation based on dependency order, not a new ga
 4. Memory CT
 5. Enemy intent display data
 6. Memory damage/hit calculation pipeline
-7. Breakage probability pipeline
+7. Cumulative wear pipeline
 8. Module instance attachment to Memory instance
 9. Map branch model + 2-step foresight
 10. Death / character loss
@@ -1117,3 +1099,8 @@ When implementing future user instructions:
 - 戦闘中もこの画面を開いて確認可能。Install・Overwrite・Memory交換は無効。既存の戦闘タイマーは継続する。
 - 戻ると元のMAP・Combat・Inventoryへ復帰し、現在のHP・装備を反映する。保存形式、補正式、Install / Overwriteの共通処理は変更しない。
 - この節の導線・画面構成は上記旧Character / Equipment画面に関する記述を置き換える。
+
+## 全画面フォント — CONFIRMED (2026-10-05)
+
+ピクセルフォントは使用しない。全画面・オーバーレイのUIは通常のシステムフォントを使用する。
+美咲フォントの読み込みと代替指定を削除する。背景・アイコンのピクセル画は維持する。

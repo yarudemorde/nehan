@@ -22,7 +22,7 @@
 
 const ALPHA = {
   weaponEndsTurn: true, // TODO(要確認): 正式仕様では未確定。α版では通常攻撃=標準実行として隔離。
-  breakIncreaseMax: 0.5,
+  breakIncreaseMax: 3.0,
   maxSlots: 3
 };
 
@@ -98,6 +98,11 @@ function normalizeModule(m){
 }
 function normalizeItem(item,rarity){
   item.instanceId??=itemId();item.rarity=canonicalRarity(item.rarity||rarity);
+  if(getMemDef(item)){
+    item.breakageRate=clamp(Number(item.breakageRate)||0,0,100);
+    // Existing broken instances stay broken; reaching 100 always disables a Memory.
+    item.broken=!!item.broken||item.breakageRate>=100;
+  }
   item.moduleSlots=RARITY_SLOTS[item.rarity];item.modules??=[];
   const used=new Set();
   item.modules.forEach((m,i)=>{
@@ -727,7 +732,7 @@ function memoryEffectText(c,m){
 function memoryDescription(c,m){
   const d=getMemDef(m),effect=memoryEffectText(c,m);
 
-  return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}${getEffectiveBasePower(m)!==d.basePower?`<br>BASE POWER ${basePowerDescription(m)}`:""}<br>現在の破損率で判定後、破損率 +0.0〜0.5%。</p>`;
+  return `<b>${esc(d.name)}</b><span class="tag ${d.execution==="STANDARD"?"std":"inst"}">${d.execution==="STANDARD"?"標準実行":"即時実行"}</span><p>${effect}</p><p>CT ${m.currentCT}/${d.ct} / 破損率 ${m.breakageRate.toFixed(2)}%${m.broken?" / BROKEN":m.currentCT?" / 待機中":""}</p><p>${d.execution==="STANDARD"?"使用するとターン終了。":"使用後も行動を継続。"} ${esc(d.description)}</p><p class="muted">${esc(d.formula)}${getEffectiveBasePower(m)!==d.basePower?`<br>BASE POWER ${basePowerDescription(m)}`:""}<br>使用後に破損率 +0.0〜3.0%。100%で使用不能。</p>`;
 }
 // A held or cancelled gesture never activates an action on release.
 // aria-disabled keeps cooling/broken memories inspectable while guarding execution.
@@ -781,41 +786,38 @@ function useWeapon(c){
 
 function useMemory(c,index){
   if(state.run?.phase!=="combat"||state.run.combat.pendingAction)return;
-  const inst=c.memories[index], d=getMemDef(inst);
+  const inst=c.memories[index];if(!inst)return;
+  const d=getMemDef(inst);if(!d)return;
+  if(inst.breakageRate>=100){
+    if(!inst.broken){inst.broken=true;save();render();}
+    return;
+  }
   if(inst.currentCT>0 || inst.broken) return;
   delete state.run.combat.feedback;
 
-  // CONFIRMED: 破損判定を先に行う。
-  const broke=Math.random()*100 < inst.breakageRate;
-
-  let resolved=true;
-  if(broke){
-    inst.broken=true;
-    logMsg(`${d.name}: MEMORY BROKEN / 効果消失`,"bad");
-    // TODO(要確認): 正式な破損時効果・同一使用の効果解決順。α版では破損した使用の効果を失敗扱い。
-    resolved=false;
-  }
-
-  if(resolved){
-    const value=calcScaled(getEffectiveBasePower(inst),getEffectiveStats(c)[d.main]);
-    if(d.category==="攻撃"){
-      if(rollHit(d.hit)){
-        const dealt=applyEnemyDamage(value);
-        logMsg(`${d.name}: ${dealt} damage`,"good");
-      }else logMsg(`${d.name}: MISS`,"bad");
-    }else if(d.category==="回復"){
-      const before=c.hp;c.hp=clamp(c.hp+value,0,getEffectiveMaxHp(c));
-      logMsg(`${d.name}: HP +${c.hp-before}`,"good");
-    }else if(d.category==="防御"){
-      state.run.shield+=value;
-      logMsg(`${d.name}: SHIELD +${value}`,"good");
-    }
+  // Resolve this use before cumulative wear; there is no probabilistic break check.
+  const value=calcScaled(getEffectiveBasePower(inst),getEffectiveStats(c)[d.main]);
+  if(d.category==="攻撃"){
+    if(rollHit(d.hit)){
+      const dealt=applyEnemyDamage(value);
+      logMsg(`${d.name}: ${dealt} damage`,"good");
+    }else logMsg(`${d.name}: MISS`,"bad");
+  }else if(d.category==="回復"){
+    const before=c.hp;c.hp=clamp(c.hp+value,0,getEffectiveMaxHp(c));
+    logMsg(`${d.name}: HP +${c.hp-before}`,"good");
+  }else if(d.category==="防御"){
+    state.run.shield+=value;
+    logMsg(`${d.name}: SHIELD +${value}`,"good");
   }
 
   inst.currentCT=d.ct;
-  const add=rand(0,ALPHA.breakIncreaseMax);
-  inst.breakageRate=clamp(inst.breakageRate+add,0,100);
+  const add=Math.round(rand(0,ALPHA.breakIncreaseMax)*100)/100;
+  inst.breakageRate=clamp(Math.round((inst.breakageRate+add)*100)/100,0,100);
   logMsg(`${d.name}: 破損率 +${add.toFixed(2)}% → ${inst.breakageRate.toFixed(2)}%`,"sys");
+  if(inst.breakageRate>=100){
+    inst.broken=true;
+    logMsg(`${d.name}: MEMORY BROKEN / 破損率100%・使用不能`,"bad");
+  }
 
   finishPlayerAction(c,d.execution==="STANDARD");
 }
