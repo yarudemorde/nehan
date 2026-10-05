@@ -1,0 +1,30 @@
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{
+ const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--disable-gpu','--no-zygote'],...(process.env.BASE_URL&&process.env.HTTPS_PROXY?{proxy:{server:process.env.HTTPS_PROXY}}:{})});
+ const defs=JSON.parse(fs.readFileSync('index.html','utf8').match(/const ENEMIES = (\[[\s\S]*?\]);/)[1]),errors=[];
+ for(const e of defs){
+  const p=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,ignoreHTTPSErrors:true});p.on('pageerror',error=>errors.push(error.message));
+  const c={id:'enemy-test',name:'対敵試験',stats:{VIT:6,STR:8,DEX:7,INT:5},maxHp:1000,hp:1000,weapon:{id:'W001',instanceId:'weapon',name:'鉄管ブレード',basePower:1,hit:100,rarity:'COMMON',modules:[]},memories:['M001','M002','M003','M004'].map((definitionId,i)=>({instanceId:'memory'+i,definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]})),inventory:{weapons:[],memories:[],modules:[]},depth:0,wins:0,createdAt:1};
+  const f={slots:[c,null,null],activeSlot:0,screen:'home',run:{ownerId:c.id,depth:0,phase:'map',shield:0,combat:null,routes:[{id:'enemy-node',side:'L',type:'battle',enemyId:e.id,future:[{type:'garage'},{type:'scrap'}]}],log:[]}};
+  await p.addInitScript(f=>{Math.random=()=>.1;if(!localStorage.getItem('nehan_alpha_v1'))localStorage.setItem('nehan_alpha_v1',JSON.stringify(f))},f);
+  const read=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('nehan_alpha_v1')));
+  async function resume(){await p.locator('#splash').click();await p.locator('#splash').waitFor({state:'detached'});await p.locator('[data-nav="play"]').click();await p.locator('[data-slot="0"]').click()}
+  await p.goto(process.env.BASE_URL||'http://localhost:8765');await resume();assert(!(await p.locator('.map-node').allTextContents()).join('').includes(e.name));await p.locator('[data-route="L"]').click();
+  await p.locator('.enemy-figure img').waitFor();await p.waitForFunction(()=>{const i=document.querySelector('.enemy-figure img');return i.complete&&i.naturalWidth>0});
+  assert((await p.locator('.enemy-figure img').getAttribute('src')).endsWith(e.art));assert.equal(await p.locator('.enemy-figure').getAttribute('data-faction'),e.faction);assert((await p.locator('.enemy-status').innerText()).includes(e.name));
+  for(const [width,height] of [[320,568],[375,667],[390,844],[393,852],[430,932]]){
+   await p.setViewportSize({width,height});await p.waitForFunction(()=>Math.abs(document.querySelector('#app').getBoundingClientRect().height-innerHeight)<1);
+   const g=await p.evaluate(()=>{const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}},overlap=(a,b)=>Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top);const enemy=box('.enemy-figure'),player=box('.player-figure');return {overflow:[document.documentElement.scrollWidth-innerWidth,document.documentElement.scrollHeight-innerHeight],canvas:box('.battle-canvas'),enemy,player,enemyOverlap:overlap(enemy,box('.enemy-status')),playerOverlap:overlap(player,box('.player-status')),icons:[...document.querySelectorAll('.action-icon')].map(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}})}});
+   assert.deepEqual(g.overflow,[0,0]);assert(Math.abs(g.canvas.width/g.canvas.height-9/16)<.001);assert(!g.enemyOverlap);assert(!g.playerOverlap);assert.equal(g.icons.length,5);assert([...g.icons,g.enemy,g.player].every(r=>r.left>=-1&&r.right<=width+1&&r.top>=-1&&r.bottom<=height+1));
+  }
+  await p.setViewportSize({width:390,height:844});if(process.env.SCREENSHOT_DIR)await p.screenshot({path:process.env.SCREENSHOT_DIR+'/enemy-'+e.id+'.png'});
+  let s=await read(),intent=s.run.combat.intent;assert.equal(intent.label,e.moves.find(m=>m.id===e.pattern[0]).label);assert((await p.locator('#enemyIntent').getAttribute('aria-label')).includes(intent.label));
+  const b=await p.locator('#enemyIntent').boundingBox();await p.mouse.move(b.x+b.width/2,b.y+b.height/2);await p.mouse.down();await p.waitForTimeout(420);assert((await p.locator('#actionDescription').innerText()).includes(intent.label));await p.mouse.up();
+  await p.locator('#weaponBtn').click();assert(await p.locator('.enemy-figure .damage-popup').isVisible());assert(await p.locator('.enemy-figure img.damage-flash').count());assert.equal((await read()).slots[0].hp,1000);assert.equal(await p.locator('#weaponBtn').getAttribute('aria-disabled'),'true');await p.waitForTimeout(300);assert.equal((await read()).run.combat.enemy.turn,0);
+  await p.waitForFunction(()=>JSON.parse(localStorage.getItem('nehan_alpha_v1')).run.combat.enemy.turn===1);
+  s=await read();if(intent.kind==='GUARD')assert.equal(s.run.combat.enemy.guard,intent.guard);else{assert.equal(s.slots[0].hp,1000-intent.damage);assert(await p.locator('.player-figure .damage-popup').isVisible())}
+  await p.waitForFunction(()=>!JSON.parse(localStorage.getItem('nehan_alpha_v1')).run.combat.pendingAction);
+  const beforeReload=await read();await p.reload();await resume();s=await read();assert.deepEqual(s.run.combat.intent,beforeReload.run.combat.intent);assert.equal(s.run.combat.enemy.turn,1);assert((await p.locator('.enemy-figure img').getAttribute('src')).endsWith(e.art));await p.close();
+ }
+ assert.deepEqual(errors,[]);await browser.close();console.log('9 actual WebP sprites, 5 mobile sizes each, no overflow/frame collisions, named intent and hold details, feedback/popups, delayed enemy action and saved turn reload PASS');
+})().catch(e=>{console.error(e);process.exit(1)});

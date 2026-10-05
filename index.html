@@ -73,10 +73,374 @@ function weaponStatKey(weapon){return weapon.mainStat||"STR";}
 function weaponPower(c){return calcScaled(getEffectiveBasePower(c.weapon),getEffectiveStats(c)[weaponStatKey(c.weapon)]);}
 
 const ENEMIES = [
-  {id:"E01",name:"廃棄ドローン",baseHp:30,atk:6,memoryPool:["M002","M004"],pattern:["ATTACK","ATTACK","GUARD"]},
-  {id:"E02",name:"違法義体狩り",baseHp:39,atk:8,memoryPool:["M001","M002"],pattern:["ATTACK","HEAVY","ATTACK"]},
-  {id:"E03",name:"逆接僧兵",baseHp:48,atk:9,memoryPool:["M003","M004"],pattern:["GUARD","HEAVY","ATTACK"]}
+  {
+    "id": "E01",
+    "name": "侵蝕警備員",
+    "faction": "blue",
+    "archetype": "防御",
+    "art": "assets/enemies/blue-guard.webp",
+    "baseHp": 30,
+    "atk": 6,
+    "legacyNames": [
+      "廃棄ドローン"
+    ],
+    "memoryPool": [
+      "M002",
+      "M004"
+    ],
+    "moves": [
+      {
+        "id": "BATON",
+        "kind": "ATTACK",
+        "label": "制圧警棒"
+      },
+      {
+        "id": "SHIELD",
+        "kind": "GUARD",
+        "label": "防盾展開",
+        "guardPower": 8
+      },
+      {
+        "id": "WATCH",
+        "kind": "GUARD",
+        "label": "警戒姿勢",
+        "guardPower": 5
+      }
+    ],
+    "pattern": [
+      "BATON",
+      "SHIELD",
+      "WATCH"
+    ]
+  },
+  {
+    "id": "E02",
+    "name": "黄角の賞金稼ぎ",
+    "faction": "yellow",
+    "archetype": "均衡",
+    "art": "assets/enemies/yellow-hunter.webp",
+    "baseHp": 39,
+    "atk": 8,
+    "legacyNames": [
+      "違法義体狩り"
+    ],
+    "memoryPool": [
+      "M001",
+      "M002"
+    ],
+    "moves": [
+      {
+        "id": "DRAW",
+        "kind": "ATTACK",
+        "label": "居合射撃"
+      },
+      {
+        "id": "PARRY",
+        "kind": "GUARD",
+        "label": "刀受け",
+        "guardPower": 7
+      },
+      {
+        "id": "HUNT",
+        "kind": "HEAVY",
+        "label": "賞金狩り"
+      }
+    ],
+    "pattern": [
+      "DRAW",
+      "PARRY",
+      "HUNT"
+    ]
+  },
+  {
+    "id": "E03",
+    "name": "般若組の剣客",
+    "faction": "red",
+    "archetype": "攻撃",
+    "art": "assets/enemies/red-yakuza.webp",
+    "baseHp": 48,
+    "atk": 9,
+    "legacyNames": [
+      "逆接僧兵"
+    ],
+    "memoryPool": [
+      "M001",
+      "M002"
+    ],
+    "moves": [
+      {
+        "id": "CRIMSON",
+        "kind": "HEAVY",
+        "label": "紅蓮斬り"
+      },
+      {
+        "id": "STAB",
+        "kind": "ATTACK",
+        "label": "追い突き"
+      },
+      {
+        "id": "CUT",
+        "kind": "ATTACK",
+        "label": "逆袈裟"
+      },
+      {
+        "id": "STANCE",
+        "kind": "GUARD",
+        "label": "納刀構え",
+        "guardPower": 4
+      }
+    ],
+    "pattern": [
+      "CRIMSON",
+      "STAB",
+      "CUT",
+      "STANCE"
+    ]
+  },
+  {
+    "id": "E04",
+    "name": "重装鎮圧官",
+    "faction": "blue",
+    "archetype": "防御",
+    "art": "assets/enemies/blue-enforcer.webp",
+    "baseHp": 44,
+    "atk": 5,
+    "memoryPool": [
+      "M003",
+      "M004"
+    ],
+    "moves": [
+      {
+        "id": "WALL",
+        "kind": "GUARD",
+        "label": "重装防壁",
+        "guardPower": 12
+      },
+      {
+        "id": "BASH",
+        "kind": "ATTACK",
+        "label": "盾撃",
+        "guardGain": 4
+      },
+      {
+        "id": "RESET",
+        "kind": "GUARD",
+        "label": "再防御",
+        "guardPower": 8
+      }
+    ],
+    "pattern": [
+      "WALL",
+      "BASH",
+      "RESET"
+    ]
+  },
+  {
+    "id": "E05",
+    "name": "電脳監察官",
+    "faction": "blue",
+    "archetype": "防御",
+    "art": "assets/enemies/blue-inspector.webp",
+    "baseHp": 36,
+    "atk": 6,
+    "memoryPool": [
+      "M002",
+      "M004"
+    ],
+    "moves": [
+      {
+        "id": "BLOCK",
+        "kind": "GUARD",
+        "label": "封鎖障壁",
+        "guardPower": 10
+      },
+      {
+        "id": "SHOCK",
+        "kind": "ATTACK",
+        "label": "電磁制圧",
+        "damageBonus": -2,
+        "guardGain": 3
+      },
+      {
+        "id": "REDEPLOY",
+        "kind": "GUARD",
+        "label": "保安再配置",
+        "guardPower": 8
+      }
+    ],
+    "pattern": [
+      "BLOCK",
+      "SHOCK",
+      "REDEPLOY"
+    ]
+  },
+  {
+    "id": "E06",
+    "name": "廃鉄の物漁り",
+    "faction": "yellow",
+    "archetype": "均衡",
+    "art": "assets/enemies/yellow-scavenger.webp",
+    "baseHp": 34,
+    "atk": 7,
+    "memoryPool": [
+      "M001",
+      "M003"
+    ],
+    "moves": [
+      {
+        "id": "SPEAR",
+        "kind": "ATTACK",
+        "label": "廃鉄刺突",
+        "damageBonus": -1
+      },
+      {
+        "id": "SALVAGE",
+        "kind": "GUARD",
+        "label": "拾得装甲",
+        "guardPower": 9
+      },
+      {
+        "id": "HOOK",
+        "kind": "HEAVY",
+        "label": "鉤槍破砕"
+      }
+    ],
+    "pattern": [
+      "SPEAR",
+      "SALVAGE",
+      "HOOK"
+    ]
+  },
+  {
+    "id": "E07",
+    "name": "渡りの銃士",
+    "faction": "yellow",
+    "archetype": "均衡",
+    "art": "assets/enemies/yellow-ronin.webp",
+    "baseHp": 35,
+    "atk": 7,
+    "memoryPool": [
+      "M002",
+      "M004"
+    ],
+    "moves": [
+      {
+        "id": "QUICKSHOT",
+        "kind": "ATTACK",
+        "label": "抜き撃ち",
+        "damageBonus": 1
+      },
+      {
+        "id": "DISTANCE",
+        "kind": "GUARD",
+        "label": "間合い制御",
+        "guardPower": 6
+      },
+      {
+        "id": "DOUBLE",
+        "kind": "ATTACK",
+        "label": "二連射",
+        "hitCount": 2,
+        "damageBonus": 2
+      }
+    ],
+    "pattern": [
+      "QUICKSHOT",
+      "DISTANCE",
+      "DOUBLE"
+    ]
+  },
+  {
+    "id": "E08",
+    "name": "解体処刑人",
+    "faction": "red",
+    "archetype": "攻撃",
+    "art": "assets/enemies/red-butcher.webp",
+    "baseHp": 42,
+    "atk": 10,
+    "memoryPool": [
+      "M001",
+      "M002"
+    ],
+    "moves": [
+      {
+        "id": "CLEAVE",
+        "kind": "ATTACK",
+        "label": "解体斬り",
+        "damageBonus": -2
+      },
+      {
+        "id": "CRUSH",
+        "kind": "HEAVY",
+        "label": "装甲断ち",
+        "shieldPierce": 0.5
+      },
+      {
+        "id": "EXECUTE",
+        "kind": "HEAVY",
+        "label": "処刑落とし",
+        "damageBonus": 2
+      }
+    ],
+    "pattern": [
+      "CLEAVE",
+      "CRUSH",
+      "EXECUTE"
+    ]
+  },
+  {
+    "id": "E09",
+    "name": "路地の鉄牙",
+    "faction": "red",
+    "archetype": "攻撃",
+    "art": "assets/enemies/red-punk.webp",
+    "baseHp": 32,
+    "atk": 7,
+    "memoryPool": [
+      "M001",
+      "M002"
+    ],
+    "moves": [
+      {
+        "id": "RUSH",
+        "kind": "ATTACK",
+        "label": "連打",
+        "hitCount": 3,
+        "damageBonus": 2
+      },
+      {
+        "id": "SPIKE",
+        "kind": "ATTACK",
+        "label": "鉄牙打ち"
+      },
+      {
+        "id": "SMASH",
+        "kind": "HEAVY",
+        "label": "頭砕き"
+      },
+      {
+        "id": "CHASE",
+        "kind": "ATTACK",
+        "label": "追撃",
+        "damageBonus": 1
+      }
+    ],
+    "pattern": [
+      "RUSH",
+      "SPIKE",
+      "SMASH",
+      "CHASE"
+    ]
+  }
 ];
+// Legacy action kinds are accepted for in-flight saves and old combat snapshots.
+const ENEMY_ACTIONS={ATTACK:{kind:"ATTACK",label:"攻撃"},HEAVY:{kind:"HEAVY",label:"強攻撃"},GUARD:{kind:"GUARD",label:"防御",guardPower:8}};
+function getEnemyDef(enemy){return ENEMIES.find(e=>e.id===enemy.id);}
+function enemySprite(enemy){return getEnemyDef(enemy)?.art||enemy.art||"assets/sentinel.svg";}
+function enemyIntentDescription(intent){
+  const hits=intent.hitCount||1;
+  return intent.kind==="GUARD"?`防御 +${intent.guard??8+state.run.depth}`:`${intent.damage} ダメージ${hits>1?` / ${hits}連撃（合計）`:""}${intent.guardGain?` / 追加防御 +${intent.guardGain}`:""}${intent.shieldPierce?` / SHIELD ${Math.round(intent.shieldPierce*100)}%貫通`:""}`;
+}
 
 // Definitions never contain installed or player-owned state.
 const MODULE_EFFECT_RULES=Object.fromEntries(["VIT","STR","DEX","INT","MAX_HP","BASE_POWER"].flatMap(target=>["flat","percent"].map(mode=>[`${target}_${mode.toUpperCase()}`,{target,mode,min:mode==="percent"?6:target==="MAX_HP"?6:target==="BASE_POWER"?1:3,max:mode==="percent"?12:target==="MAX_HP"?12:target==="BASE_POWER"?3:6}])));
@@ -247,6 +611,11 @@ function normalizeState(saved){
   if(saved.run?.loot?.type==="MODULE")normalizeModule(saved.run.loot.item);
   const run=saved.run;
   if(run){
+    const enemy=run.combat?.enemy,definition=enemy&&getEnemyDef(enemy);
+    if(definition&&!enemy.moves){
+      // Keep HP/guard/turn and the already-pending intent; update later choices to named moves.
+      Object.assign(enemy,{name:definition.name,art:definition.art,faction:definition.faction,moves:definition.moves.map(m=>({...m})),pattern:[...definition.pattern]});
+    }
     run.routes=(run.routes||[]).map((r,i)=>({...normalizeNode(r,run.depth,i?"R":"L"),side:r.side||(i?"R":"L")}));
     if(run.selectedNode)run.selectedNode=normalizeNode(run.selectedNode,run.depth);
     // Old main incremented depth before showing loot. Do not add it a second time.
@@ -336,7 +705,7 @@ function makeRoutes(depth,rng=Math.random,previews=null){
   return ["L","R"].map((side,i)=>({...((previews?.[i])||makeNode(depth,side,rng)),side,future:[makeNode(depth+1,"L",rng),makeNode(depth+1,"R",rng)]}));
 }
 function normalizeNode(node,depth=0,side="L"){
-  if(typeof node==="string")node={type:"battle",enemyId:ENEMIES.find(e=>e.name===node)?.id};
+  if(typeof node==="string")node={type:"battle",enemyId:ENEMIES.find(e=>(e.name===node||e.legacyNames?.includes(node)))?.id};
   const result={...node,id:node?.id||itemId(),type:node?.type||"battle"};
   if(result.type==="battle")result.enemyId??=ENEMIES[(depth+(side==="R"?1:0))%ENEMIES.length].id;
   if(Array.isArray(node?.future))result.future=node.future.map((n,i)=>normalizeNode(n,depth+1,i?"R":"L"));
@@ -668,17 +1037,17 @@ function startCombat(side){
 }
 
 function chooseEnemyIntent(){
-  const e=state.run.combat.enemy;
-  const kind=e.pattern[e.turn % e.pattern.length];
-  if(kind==="ATTACK") state.run.combat.intent={kind,damage:e.atk+Math.floor(state.run.depth/2),label:"攻撃"};
-  else if(kind==="HEAVY") state.run.combat.intent={kind,damage:e.atk+4+Math.floor(state.run.depth/2),label:"強攻撃"};
-  else state.run.combat.intent={kind,damage:0,label:"防御"};
+  const e=state.run.combat.enemy,key=e.pattern[e.turn % e.pattern.length];
+  const move=(e.moves||getEnemyDef(e)?.moves||[]).find(m=>m.id===key)||ENEMY_ACTIONS[key]||ENEMY_ACTIONS.ATTACK;
+  const damage=move.kind==="GUARD"?0:Math.max(0,e.atk+Math.floor(state.run.depth/2)+(move.kind==="HEAVY"?4:0)+(move.damageBonus||0));
+  state.run.combat.intent={...move,damage,hitCount:move.hitCount||1};
+  if(move.kind==="GUARD")state.run.combat.intent.guard=(move.guardPower??8)+state.run.depth;
 }
 
 function renderCombat(c){
   const combat=state.run.combat, e=combat.enemy, intent=combat.intent;
   const busy=!!combat.pendingAction;
-  const enemyArt={E01:"sentinel",E02:"hunter",E03:"monk"}[e.id]||"sentinel";
+  const enemyArt=enemySprite(e);
   // All overlays share the complete 864 × 1536 artwork coordinate system.
   el.innerHTML=`
   <section class="battle-viewport" aria-label="戦闘">
@@ -689,12 +1058,12 @@ function renderCombat(c){
         <div class="hpbar"><i style="width:${clamp(e.hp/e.maxHp*100,0,100)}%"></i><span class="hp-value">${e.hp} / ${e.maxHp}</span></div>
         <div class="battle-status-note">${e.guard?`GUARD ${e.guard} · `:""}DEPTH ${state.run.depth}</div>
       </div>
-      <button class="enemy-intent" id="enemyIntent" aria-label="次の行動：${esc(intent.label)}${intent.damage?`、${intent.damage}ダメージ`:"、防御態勢"}" aria-describedby="actionDescription">
+      <button class="enemy-intent" id="enemyIntent" aria-label="次の行動：${esc(intent.label)}、${esc(enemyIntentDescription(intent))}" aria-describedby="actionDescription">
         <svg viewBox="0 0 32 32" aria-hidden="true">${intent.kind==="GUARD"?`<path d="M16 3 27 8v10c0 6-11 11-11 11S5 24 5 18V8Z"/>`:`<path d="m7 25 18-18 3-3v7L12 27M4 20l8 8M5 27l3-3"/>${intent.kind==="HEAVY"?`<path d="M6 4v8M2 8h8"/>`:""}`}</svg>
-        <span>${esc(intent.label)}${intent.damage?` ${intent.damage}`:""}</span>
+        <span>${intent.kind==="GUARD"?`+${intent.guard??8+state.run.depth}`:intent.damage}${(intent.hitCount||1)>1?` / ${intent.hitCount}H`:""}</span>
       </button>
       <button class="battle-menu" id="exitRun" aria-label="ホームへ戻る"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M5 16h22M5 24h22"/></svg></button>
-      <div class="enemy-figure"><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="assets/${enemyArt}.svg" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
+      <div class="enemy-figure" data-enemy-id="${esc(e.id)}" data-faction="${esc(e.faction||getEnemyDef(e)?.faction||"legacy")}"><img class="${combat.feedback?.target==="enemy"&&combat.feedback.value>0?"damage-flash":""}" src="${esc(enemyArt)}" alt="${esc(e.name)}">${damagePopup(combat,"enemy")}</div>
       <div class="battle-message" role="status">${combat.log.slice(-2).map(x=>`<div class="${x.cls||""}">${esc(x.text)}</div>`).join("")}</div>
       <div class="player-figure"><img class="${combat.feedback?.target==="player"&&combat.feedback.value>0?"damage-flash":""}" src="assets/protagonist.svg" alt="${esc(c.name)}">${damagePopup(combat,"player")}</div>
       <button class="player-status player-health" id="playerDetails" aria-label="モジュール装着画面を開く" aria-describedby="actionDescription">
@@ -718,7 +1087,7 @@ function renderCombat(c){
     bindActionHold(button,()=>memoryDescription(c,m),()=>{if(!m.broken&&m.currentCT===0)useMemory(c,i);});
   });
   bindActionHold(document.querySelector("#playerDetails"),()=>`<b>${esc(c.name)}</b><p>${statsDescription(c)}</p><p>HP ${c.hp} / ${getEffectiveMaxHp(c)} · SHIELD ${state.run.shield}</p>`,()=>openModuleInstall(c));
-  bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${intent.damage?`${intent.damage} ダメージ`:"防御態勢"}</p>`,()=>{});
+  bindActionHold(document.querySelector("#enemyIntent"),()=>`<b>次の行動：${esc(intent.label)}</b><p>${esc(enemyIntentDescription(intent))}</p>`,()=>{});
   scheduleCombatResolution(c);
 }
 
@@ -869,15 +1238,22 @@ function checkVictory(c){
 function endPlayerTurn(c){
   const combat=state.run.combat,e=combat.enemy,intent=combat.intent;
   if(intent.kind==="ATTACK"||intent.kind==="HEAVY"){
-    let dmg=intent.damage;
-    const cut=Math.min(state.run.shield,dmg);
-    state.run.shield-=cut;dmg-=cut;
-    c.hp=Math.max(0,c.hp-dmg);
-    combat.feedback={target:"player",value:dmg};
-    logMsg(`${e.name}: ${intent.label} / ${dmg} damage${cut?` (SHIELD ${cut})`:""}`,"bad");
+    // Damage retains the existing scaling. Burst hits divide that total, never multiply it.
+    const hits=Math.max(1,intent.hitCount||1),pierce=clamp(intent.shieldPierce||0,0,1);
+    let dealt=0,absorbed=0;
+    for(let i=0;i<hits;i++){
+      const raw=Math.floor(intent.damage/hits)+(i<intent.damage%hits?1:0);
+      const bypass=Math.floor(raw*pierce),cut=Math.min(state.run.shield,raw-bypass);
+      state.run.shield-=cut;absorbed+=cut;dealt+=raw-cut;
+    }
+    c.hp=Math.max(0,c.hp-dealt);
+    combat.feedback={target:"player",value:dealt};
+    logMsg(`${e.name}: ${intent.label}${hits>1?` / ${hits} HIT`:""} / ${dealt} damage${absorbed?` (SHIELD ${absorbed})`:""}`,"bad");
+    if(intent.guardGain){e.guard+=intent.guardGain;logMsg(`${e.name}: 追加防御 +${intent.guardGain}`,"sys");}
   }else{
-    e.guard+=8+state.run.depth;
-    logMsg(`${e.name}: GUARD +${8+state.run.depth}`,"bad");
+    const guard=intent.guard??8+state.run.depth;
+    e.guard+=guard;
+    logMsg(`${e.name}: ${intent.label} / GUARD +${guard}`,"bad");
   }
 
   if(c.hp<=0){

@@ -176,12 +176,12 @@ body:has(#app[data-screen="combat"]){background:#000}
 .enemy-intent{left:67.1296%;width:13.8889%;touch-action:none;-webkit-touch-callout:none;user-select:none}
 .battle-menu{left:82.4074%;width:14.0046%}
 .enemy-intent svg,.battle-menu svg{width:7cqw;height:7cqw;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.enemy-intent span{font-size:2.4cqw;line-height:1;color:#d8babe;white-space:nowrap}
+.enemy-intent span{font-size:clamp(10px,2.4cqw,12px);line-height:1;color:#d8babe;white-space:nowrap}
 .enemy-figure,.player-figure{position:absolute;pointer-events:none;z-index:1}
 .enemy-figure{left:40%;top:23%;width:52%;height:38%}
 .player-figure{left:0;top:51%;width:57%;height:31%}
 .enemy-figure img,.player-figure img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}
-.enemy-figure img{object-position:center bottom}
+.enemy-figure img{object-position:center bottom;image-rendering:pixelated}
 .player-figure img{object-position:left bottom}
 .battle-message{position:absolute;left:4%;top:49%;width:42%;max-height:8%;z-index:2;overflow:hidden;color:#e1d9d9;font-size:2.7cqw;text-shadow:0 1px 3px #000;pointer-events:none}
 .battle-message div{line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
