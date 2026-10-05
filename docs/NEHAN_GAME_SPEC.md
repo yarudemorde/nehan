@@ -1069,7 +1069,7 @@ When implementing future user instructions:
 - Garageはphase=garage。修復で `getEffectiveMaxHp(c)` までHP全回復して次MAPへ進む。立ち去る場合もノードを消費して次MAPへ進むがHPは変えない。CT、破損率、BROKEN、Module、装備、SHIELDは変更しない。Homeへ戻ってもphaseを保持し、PLAYから未完了Garageへ復帰する。
 - Scrapはphase=scrap。入場時に `generateScrapLoot(depth)` で一個生成して `run.scrapLoot` を保存し、表示・reloadで再抽選しない。`SCRAP_DROP` はWEAPON 0.5 / MEMORY 0.5、MODULEは含まない。WEAPONS / MEMORIESから定義を抽選し、Instance化してから深度別rarityを設定する。
 - Weapon Instanceは定義のid・性能をコピーし、instanceId / rarity / moduleSlots / modules / generatedDepthを保持する。Memoryは既存 `createMemoryInstance()` を利用する。Slot数はCOMMON 1 / UNCOMMON 2 / RARE 3 / EPIC 4 / LEGENDARY 5。
-- `inventory:{weapons:[], memories:[], modules:[]}`。Scrap回収品はそれぞれStorageへ追加し、自動装備しない。Inventory WEAPONSタブ、Character / EquipmentのSTORAGE、工房画面の所持装備選択から確認・Module装着ができる。装備武器変更機能は追加しない。Storage武器のModuleは装備していないためキャラクター能力へ反映しない。
+- `inventory:{weapons:[], memories:[], modules:[]}`。Scrap回収品はそれぞれStorageへ追加し、自動装備しない。Inventory WEAPONSタブ、Character / EquipmentのSTORAGE、工房画面の所持装備選択から確認・Module装着ができる。装着画面内の装備変更からStorage武器個体と交換できる。Storage武器のModuleは装備していないためキャラクター能力へ反映しない。
 - `advanceDepth()` はLoot回収、Garage修復／立ち去り、Scrap回収の完了後に一度だけDepthを増やす。phaseとownerIdを確認し、完了後はmapへ移行して選択Nodeと未回収Lootを削除する。最深部 `c.depth` は完了Depthの最大値。踏破数 `c.wins` は従来どおり敵撃破数であり、Garage/Scrapでは増やさない。
 - 保存キーを維持。旧routeの欠落typeはbattle、旧Future敵名文字列はbattle Nodeへ変換する。`inventory.weapons` がなければ空配列を補完する。旧mainの回収待ちLootは既にDepth増加済みのため、`lootDepthAdvanced=true`で追加加算を避ける。新規Lootはfalseを保存する。Garage phase、Scrap phase、scrapLoot、予告Node、Storage Weapon個体を保存する。
 - GarageとScrapは既存工房背景を流用した別画面。9:16固定・safe-area・全体スクロールなし。Module工房・Combat・Character作成画面の構成を変更しない。
@@ -1095,7 +1095,7 @@ When implementing future user instructions:
 - モジュール選択・装着画面は可読性を優先した通常のシステムフォントを使用する。ピクセルフォントは使用しない。
 - MAP・Combatの名前＋HP枠をタップすると、旧Character / Equipment一覧を経由せず専用モジュール装着画面へ直接進む。Home Inventoryの装備項目も同じ画面を開く。
 - 独立した旧武器・Memory詳細ページおよび装備管理オーバーレイは廃止。装着先の情報とSlotは装着画面内で確認する。未選択時は名前・職業・HP・基礎→実効能力を表示する。
-- Memory交換は装着画面の装備Memory選択時のCHANGEから利用できる。個体情報を保持する既存共通処理を使用する。
+- 武器・Memory交換は装着画面の装備アイコン選択時の「装備変更」から利用できる。中央一覧を所持個体一覧へ切り替え、別画面や交換専用オーバーレイは作らない。個体情報を保持する共通処理を使用する。
 - 戦闘中もこの画面を開いて確認可能。Install・Overwrite・Memory交換は無効。既存の戦闘タイマーは継続する。
 - 戻ると元のMAP・Combat・Inventoryへ復帰し、現在のHP・装備を反映する。保存形式、補正式、Install / Overwriteの共通処理は変更しない。
 - この節の導線・画面構成は上記旧Character / Equipment画面に関する記述を置き換える。
@@ -1132,3 +1132,12 @@ When implementing future user instructions:
 - E01/E02/E03のIDと旧名の予告データを継承する。旧進行中戦闘のHP・GUARD・turn・pendingAction・現在のintentは保持し、以後の予告は新しい技を使う。
 - MAPには敵の名前を表示しない。既存の深度と左右差による敵選択に9体すべてが参加する。
 - TODO(要確認): 9体のHP/攻撃/防御量と出現深度の最終バランス。今回の値は初期実装値。
+
+
+## 全画面ホーム・同一画面内装備変更 — CONFIRMED (2026-10-05)
+
+- ホームは端末全幅・全高へ背景を表示し、9:16固定による上下余白を作らない。添付画像を参考に生成した白黒の縦長都市背景を使い、タイトルと操作UIはHTMLで重ねる。
+- 下方の白枠・黒背景メニューは左右スワイプで選択し、タップで開く。マウスドラッグ・左右キーにも対応。
+- 装着画面内で装備武器・Memoryを選び「装備変更」を押すと、中央一覧から所持武器・Memoryを選んで交換する。同じ画面に留まり、装備変更直後にModule装着を続けられる。
+- 武器は1個、Memoryは4個を維持し、個体全体をStorageと入れ替える。武器の装備制限はcanEquipWeapon()を使用し、旧職業未設定キャラクターは従来どおり全武器を扱える。
+- 装備変更による補正は装備中個体だけを集計。最大HP減少時のみ現在HPをclampし、増加時の自動回復はしない。戦闘中は交換およびModule Install/Overwriteを禁止。保存形式・ドロップ率・戦闘計算式は維持。
