@@ -672,9 +672,9 @@ function newRun(char){
 const NODE_WEIGHTS={battle:60,garage:20,scrap:20};
 const SCRAP_DROP={WEAPON:.5,MEMORY:.5};
 const NODE_DEFINITIONS={
-  battle:{label:"戦闘",shortLabel:"戦闘",icon:'<path d="m7 25 18-18 3-3v7L12 27M4 20l8 8M5 27l3-3"/>',enter:(node)=>startCombat(node.side)},
-  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:'<path d="M21 3a8 8 0 0 0-9 10L4 21a4 4 0 0 0 6 6l8-8a8 8 0 0 0 11-9l-6 5-5-5Z"/>',enter:(node,c)=>enterRestNode(c,node,"garage")},
-  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:'<path d="m4 10 12-6 12 6v16H4ZM4 10l12 6 12-6M16 16v10M10 7l12 6"/>',enter:(node,c)=>enterRestNode(c,node,"scrap")}
+  battle:{label:"戦闘",shortLabel:"戦闘",icon:"assets/map-icon-battle.svg",enter:(node)=>startCombat(node.side)},
+  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:"assets/map-icon-garage.svg",enter:(node,c)=>enterRestNode(c,node,"garage")},
+  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:"assets/map-icon-scrap.svg",enter:(node,c)=>enterRestNode(c,node,"scrap")}
 };
 // TODO(要確認): ノード比率とScrapレア度分布の最終バランス。現在は初期実装パラメータ。
 const SCRAP_RARITY_CURVE=[
@@ -744,7 +744,7 @@ function collectScrap(c){
   c.inventory[loot.type==="WEAPON"?"weapons":"memories"].push(loot.item);
   return advanceDepth(c,"scrap");
 }
-function nodeIcon(node){const d=NODE_DEFINITIONS[node.type];return `<svg viewBox="0 0 32 32" aria-hidden="true">${d?.icon||""}</svg>`;}
+function nodeIcon(node){const d=NODE_DEFINITIONS[node.type];return d?.icon?`<img class="map-node-icon" src="${d.icon}" alt="" aria-hidden="true">`:"";}
 function nodeLabel(node,short=false){const d=NODE_DEFINITIONS[node.type];return d?(short?d.shortLabel:d.label):"未定義";}
 function renderExploration(c,type){
   const garage=type==="garage",loot=state.run.scrapLoot;
