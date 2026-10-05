@@ -214,7 +214,7 @@ body:has(#app[data-screen="map"]){background:#000}
 .map-node{position:absolute;left:var(--node-x);min-height:0;border:0;background:transparent;color:#eee9e9;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1cqw;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;pointer-events:auto;cursor:pointer;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
 .map-choice{top:44.27%;width:15.97%;height:10.87%}
 .map-preview{top:30.6%;width:10.07%;height:6.64%}
-.map-node-art{position:absolute;inset:0;overflow:hidden;clip-path:inherit;pointer-events:none}
+.map-node-art{position:absolute;inset:0;overflow:hidden;clip-path:inherit;pointer-events:none;background:#000}
 .map-node-icon{position:absolute;display:block;left:calc(0% - var(--sheet-x));top:-8.9201878%;width:426.6666667%;height:120.1877934%;max-width:none;object-fit:fill;image-rendering:pixelated;pointer-events:none}
 .map-node:focus-visible{outline:0;background:#74212c55}
 .map-choice:active{background:#74212c55}

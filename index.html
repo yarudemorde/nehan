@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=1.5">
+<link rel="stylesheet" href="style.css?v=1.6">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -672,9 +672,9 @@ function newRun(char){
 const NODE_WEIGHTS={battle:60,garage:20,scrap:20};
 const SCRAP_DROP={WEAPON:.5,MEMORY:.5};
 const NODE_DEFINITIONS={
-  battle:{label:"戦闘",shortLabel:"戦闘",icon:"assets/map-node-sheet.webp",iconX:106,enter:(node)=>startCombat(node.side)},
-  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:"assets/map-node-sheet.webp",iconX:586,enter:(node,c)=>enterRestNode(c,node,"garage")},
-  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:"assets/map-node-sheet.webp",iconX:1066,enter:(node,c)=>enterRestNode(c,node,"scrap")}
+  battle:{label:"戦闘",shortLabel:"戦闘",icon:"assets/map-node-sheet-dark.webp",iconX:106,enter:(node)=>startCombat(node.side)},
+  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:"assets/map-node-sheet-dark.webp",iconX:586,enter:(node,c)=>enterRestNode(c,node,"garage")},
+  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:"assets/map-node-sheet-dark.webp",iconX:1066,enter:(node,c)=>enterRestNode(c,node,"scrap")}
 };
 // TODO(要確認): ノード比率とScrapレア度分布の最終バランス。現在は初期実装パラメータ。
 const SCRAP_RARITY_CURVE=[
@@ -744,7 +744,7 @@ function collectScrap(c){
   c.inventory[loot.type==="WEAPON"?"weapons":"memories"].push(loot.item);
   return advanceDepth(c,"scrap");
 }
-// Preserve the supplied sheet unchanged: each CSS window selects a 360 × 426 hex at y=38.
+// Each CSS window selects a 360 × 426 hex at y=38 from the black-interior artwork sheet.
 function nodeIcon(node){const d=NODE_DEFINITIONS[node.type];return d?.icon?`<span class="map-node-art" aria-hidden="true"><img class="map-node-icon" src="${esc(d.icon)}" alt="" width="1536" height="512" style="--sheet-x:${d.iconX/360*100}%"></span>`:"";}
 function nodeLabel(node,short=false){const d=NODE_DEFINITIONS[node.type];return d?(short?d.shortLabel:d.label):"未定義";}
 function renderExploration(c,type){
