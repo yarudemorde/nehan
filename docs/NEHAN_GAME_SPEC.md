@@ -995,7 +995,7 @@ When implementing future user instructions:
 ## 追加確定仕様：戦利品・所持メモリ・Module — CONFIRMED (2026-10-04)
 
 - 敵撃破ごとに戦利品を1個生成する。MEMORY 20%、MODULE 80%。`combat → loot → map` の順に進み、回収前の戦利品を `state.run.loot` に保存する。リロードでは再抽選せず、回収は1回のみ。
-- 各 EnemyDefinition の `memoryPool` は装備・使用していたメモリ候補。9体それぞれの候補は「9体の敵・派閥別戦術」の表に準拠する。AIの実際のメモリ使用は今回追加しない。
+- 各 EnemyDefinition の `memoryPool` は装備・使用していたメモリ候補。9体それぞれの候補は各EnemyDefinitionの `memoryPool` に定義する。AIの実際のメモリ使用は今回追加しない。
 - Module は `MODULES` から抽選する。将来の敵別 `modulePool` にも対応。レア度の抽選ルールは追加せず、各定義の既存レア度を引き継ぐ。
 - `c.memories` は装備中の4個。未装備メモリは `c.inventory.memories`、未使用Moduleは `c.inventory.modules` に保存する。同じメモリ定義の複数個体を所持でき、`instanceId` で区別する。
 - 武器・メモリ個体は `instanceId / rarity / moduleSlots / modules` を持つ。COMMON=1、UNCOMMON=2、RARE=3、EPIC=4、LEGENDARY=5スロット。初期鉄管ブレードはCOMMON、1スロット。
