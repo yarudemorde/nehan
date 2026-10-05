@@ -328,3 +328,9 @@ body:has(#app:is([data-screen="garage"],[data-screen="scrap"])){background:#000}
 .salvage-actions{flex:none;display:grid;gap:8px}.salvage-actions .btn{min-height:44px;text-align:center}.salvage-actions .btn:disabled{opacity:.4}
 .creation-memory-slots [data-recovered-detail]{display:block;font-size:11px;color:#ddd;line-height:1.4;margin-top:4px}
 .salvage-screen .kicker{color:#ccc}.salvage-actions .btn:hover:not(:disabled){border-color:#ad5555}
+
+.creation-memory-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;position:sticky;top:0;z-index:1;background:#090808;padding-bottom:6px}
+.creation-memory-tabs button,.creation-memory-choice{font:inherit;color:#eee;background:#111;border:1px solid #666;text-align:left;padding:10px;min-height:44px}
+.creation-memory-tabs :is(b,small),.creation-memory-choice :is(b,small){display:block}.creation-memory-tabs b{font-size:12px}.creation-memory-tabs small{font-size:10px;color:#bbb}
+.creation-memory-tabs button[aria-pressed="true"],.creation-memory-choice[aria-pressed="true"]{border-color:#b96565;background:#251717}
+.creation-memory-catalog{display:grid;gap:8px}.creation-memory-catalog h3{font-size:13px;margin:8px 0 2px}.creation-memory-choice{width:100%;line-height:1.55;font-size:12px}.creation-memory-choice b{font-size:16px}.creation-memory-choice img{width:44px;height:44px;float:right;object-fit:contain}.creation-memory-choice p{margin:6px 0;color:#ddd}

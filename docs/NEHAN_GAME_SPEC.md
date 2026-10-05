@@ -1183,3 +1183,11 @@ When implementing future user instructions:
 - 新Characterで通常の破損処理を継続する。再死亡時に自動回収されず、再びSalvageで選択しなければ失われる。同一instanceIdを複数CharacterやmetaInventoryへ重複所有させない。
 - STORAGE_KEYは`nehan_alpha_v1`を維持。旧セーブにmetaInventoryが無い場合は空配列を補完する。既存Characterが所有する個体と重複した回収Storage参照は除外する。回収個体のロード時に性能を再生成しない。
 - UIは黒・白・赤、通常フォント。死亡画面と作成メモリ編集の一覧のみ内部スクロールし、回収・確定・戻るボタンは画面内に維持する。
+
+### CONFIRMED — 職業の固定初期ロードアウトと詳細一覧 / 2026-10-05
+
+- `JobDefinition.startingLoadout:{weaponId,memoryIds[4]}`で職業ごとの初期装備を定義する。賞金稼ぎは鉄管ブレード（W001）、破砕・速断・応急修復・防壁展開（M001〜M004）。職業を選択すると初期装備を設定する。装備可能武器種の固有能力と、作成時の初期武器候補は別の制限である。
+- 作成時の通常メモリ候補は職業の初期4種のみ。全Definitionを無料選択させない。別MemoryはmetaInventoryの回収個体として所有している場合に選択できる。createCharacter、Draft検証、候補変更の共通処理でも制限し、UI以外からの未所持Memory選択も拒否する。
+- 武器・メモリは既存作成画面から詳細一覧を開く。武器はレア度・種別・威力・MAIN・命中・HIT数・Module容量を表示。メモリは4枠から装着先を選択し、職業初期装備または回収個体のカードを押して設定する。威力（Module補正含む）・HIT数・命中・CT・効果・説明・レア度を表示する。回収個体には破損率・BROKEN・取得深度・装着Moduleも表示する。
+- 回収個体の選択・取消・BACKでは消費しない。CREATEで同じ個体を移動し、破損率・Module・instanceIdを維持する。同名Definitionの複数装備禁止は維持し、選択時は既存枠と交換する。
+- 職業変更や旧Draftロード時は、回収個体を保持しながら未所持の通常Memoryを職業の初期装備へ補正する。既存Characterの武器・メモリは変更しない。全体画面はスクロールせず、詳細一覧だけ内部スクロールする。フォントは通常フォントを維持する。

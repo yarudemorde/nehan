@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=2.0">
+<link rel="stylesheet" href="style.css?v=2.1">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city-tall.webp">
 
@@ -78,6 +78,7 @@ const MEMORIES = [
 const JOBS = [
   {id:"JOB_BOUNTY_HUNTER",name:"賞金稼ぎ",stats:{VIT:6,STR:8,DEX:7,INT:5},
     primaryStat:"STR",secondaryStat:"DEX",weaponAccess:{type:"ALL"},
+    startingLoadout:{weaponId:"W001",memoryIds:["M001","M002","M003","M004"]},
     ability:{id:"WEAPON_MASTERY",name:"武器習熟",description:"すべての武器種を装備できる。"}}
 ];
 const WEAPONS = [
@@ -691,10 +692,19 @@ function normalizeState(saved){
   const recoveredIds=new Set();
   saved.metaInventory.memories=saved.metaInventory.memories.filter(m=>{if(!m?.instanceId||!getMemDef(m)||ownedIds.has(m.instanceId)||recoveredIds.has(m.instanceId))return false;recoveredIds.add(m.instanceId);return true;});
   saved.createDraft??=null;
+  if(saved.createDraft)normalizeCreationDraft(saved.createDraft,saved);
   return saved;
 }
+function normalizeCreationDraft(d,owner=state){
+  const job=JOBS.find(j=>j.id===d.jobId);if(!job?.startingLoadout)return d;
+  d.weaponId=job.startingLoadout.weaponId;d.memoryIds??=[];d.recoveredMemoryIds??=[null,null,null,null];
+  const used=new Set();
+  for(let i=0;i<4;i++){const m=owner.metaInventory?.memories.find(m=>m.instanceId===d.recoveredMemoryIds[i]);if(m&&!used.has(m.definitionId)){d.memoryIds[i]=m.definitionId;used.add(m.definitionId);}else d.recoveredMemoryIds[i]=null;}
+  for(let i=0;i<4;i++)if(!d.recoveredMemoryIds[i]){const old=d.memoryIds[i];d.memoryIds[i]=job.startingLoadout.memoryIds.includes(old)&&!used.has(old)?old:job.startingLoadout.memoryIds.find(id=>!used.has(id));used.add(d.memoryIds[i]);}
+  d.memoryIds.length=4;d.recoveredMemoryIds.length=4;return d;
+}
 function newCreationDraft(slotIndex){
-  return {slotIndex,name:"名無し",jobId:JOBS[0].id,weaponId:null,memoryIds:MEMORIES.slice(0,4).map(m=>m.id),recoveredMemoryIds:[null,null,null,null]};
+  return normalizeCreationDraft({slotIndex,name:"名無し",jobId:JOBS[0].id,memoryIds:[],recoveredMemoryIds:[null,null,null,null]});
 }
 function creationName(value){return Array.from(String(value||"").trim()).slice(0,16).join("")||"名無し";}
 function creationMemory(d,index){
@@ -704,18 +714,19 @@ function creationMemory(d,index){
 function validCreationDraft(d){
   if(!d)return false;
   const job=JOBS.find(x=>x.id===d.jobId),weapon=WEAPONS.find(x=>x.id===d.weaponId);
-  if(!canEquipWeapon(job,weapon)||!Array.isArray(d.memoryIds)||d.memoryIds.length!==4||(d.recoveredMemoryIds&&d.recoveredMemoryIds.length!==4))return false;
+  if(weapon?.id!==job?.startingLoadout?.weaponId||!canEquipWeapon(job,weapon)||!Array.isArray(d.memoryIds)||d.memoryIds.length!==4||(d.recoveredMemoryIds&&d.recoveredMemoryIds.length!==4))return false;
   const definitions=d.memoryIds.map((id,i)=>d.recoveredMemoryIds?.[i]?creationMemory(d,i)?.definitionId:id);
   const recovered=(d.recoveredMemoryIds||[]).filter(Boolean);
   const owned=state.slots.filter(Boolean).flatMap(c=>[...c.memories,...c.inventory.memories]);
-  return new Set(definitions).size===4&&definitions.every(id=>MEMORIES.some(m=>m.id===id))&&new Set(recovered).size===recovered.length&&!owned.some(m=>recovered.includes(m.instanceId));
+  return new Set(definitions).size===4&&definitions.every((id,i)=>MEMORIES.some(m=>m.id===id)&&(d.recoveredMemoryIds?.[i]||job.startingLoadout.memoryIds.includes(id)))&&new Set(recovered).size===recovered.length&&!owned.some(m=>recovered.includes(m.instanceId));
 }
 function setCreationMemory(d,index,value){
   d.recoveredMemoryIds??=[null,null,null,null];
   const recovered=value.startsWith("recovered:")?state.metaInventory.memories.find(m=>m.instanceId===value.slice(10)):null;
   if(value.startsWith("recovered:")&&!recovered)return false;
   const definitionId=recovered?.definitionId||value;
-  if(!MEMORIES.some(m=>m.id===definitionId))return false;
+  const job=JOBS.find(j=>j.id===d.jobId);
+  if(index<0||index>3||!MEMORIES.some(m=>m.id===definitionId)||(!recovered&&!job?.startingLoadout?.memoryIds.includes(definitionId)))return false;
   // TODO(要確認): 同一MemoryDefinitionの複数装備可否。既存の重複禁止を維持する。
   const other=d.memoryIds.findIndex((id,i)=>i!==index&&(creationMemory(d,i)?.definitionId||id)===definitionId);
   if(other>=0){d.memoryIds[other]=d.memoryIds[index];d.recoveredMemoryIds[other]=d.recoveredMemoryIds[index];}
@@ -940,6 +951,7 @@ function creationIcon(kind){
 function renderCreate(){
   if(!Number.isInteger(state.activeSlot)||state.activeSlot<0||state.activeSlot>=ALPHA.maxSlots||state.slots[state.activeSlot]){state.screen="play";return render();}
   if(state.createDraft?.slotIndex!==state.activeSlot)state.createDraft=newCreationDraft(state.activeSlot);
+  normalizeCreationDraft(state.createDraft);
   const d=state.createDraft,job=JOBS.find(x=>x.id===d.jobId),weapon=WEAPONS.find(x=>x.id===d.weaponId);
   const rows=[["name","名前",creationName(d.name)],["job","職業",job?.name||"未選択"],["weapon","武器",weapon?.name||"武器を選択"],["memory","メモリ",`${d.memoryIds.filter(id=>MEMORIES.some(m=>m.id===id)).length} / 4`]];
   el.innerHTML=`<section class="creation-viewport" aria-label="キャラクター作成"><div class="creation-scene">
@@ -961,10 +973,9 @@ function openCreationEditor(kind){
   const titles={name:"名前",job:"職業",weapon:"武器",memory:"メモリ"};
   let body="";
   if(kind==="name")body=`<label for="nameInput">名前（最大16文字）</label><input id="nameInput" type="text" maxlength="16" autocomplete="off" value="${esc(draft.name)}">`;
-  if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}</span></span></label>`).join("");
-  if(kind==="weapon")body=WEAPONS.map(w=>`<label class="creation-option"><input type="radio" name="creationWeapon" value="${w.id}" ${draft.weaponId===w.id?"checked":""} ${canEquipWeapon(job,w)?"":"disabled"}><span><b>${esc(w.name)}</b><span class="creation-option-detail">武器種 ${esc(weaponTypeLabel(w.weaponType))} · 攻撃 ${w.basePower}<br>命中 ${w.hit}% · ${w.mainStat} · ${w.hitCount} HIT</span></span></label>`).join("");
-  const recoveredSpec=m=>`${m.rarity} · 破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN":""} · MODULE ${m.modules.length} / ${m.moduleSlots}`;
-  if(kind==="memory")body=`<div class="creation-memory-slots">${draft.memoryIds.map((id,i)=>`<label>MEMORY 0${i+1}<select data-memory-slot="${i}" aria-label="メモリ${i+1}"><optgroup label="通常メモリ">${MEMORIES.map(m=>`<option value="${m.id}" ${!draft.recoveredMemoryIds[i]&&m.id===id?"selected":""}>${esc(m.name)}</option>`).join("")}</optgroup><optgroup label="Recovered Memory / 持ち込みで消費">${state.metaInventory.memories.map(m=>`<option value="recovered:${esc(m.instanceId)}" ${draft.recoveredMemoryIds[i]===m.instanceId?"selected":""}>${esc(itemName(m))} · ${esc(recoveredSpec(m))}</option>`).join("")}</optgroup></select><small data-recovered-detail="${i}"></small></label>`).join("")}</div><p class="creation-edit-note">回収個体は作成確定時だけ移動します。破損・Moduleはそのまま。同名メモリを選ぶとスロットを入れ替えます。</p>`;
+  if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}<br>初期武器：${esc(WEAPONS.find(w=>w.id===j.startingLoadout.weaponId).name)}<br>初期メモリ：${j.startingLoadout.memoryIds.map(id=>esc(getMemDef({definitionId:id}).name)).join(" / ")}</span></span></label>`).join("");
+  if(kind==="weapon")body=WEAPONS.filter(w=>w.id===job.startingLoadout.weaponId).map(w=>`<label class="creation-option"><input type="radio" name="creationWeapon" value="${w.id}" ${draft.weaponId===w.id?"checked":""} ${canEquipWeapon(job,w)?"":"disabled"}><span><b>${esc(w.name)}</b><span class="creation-option-detail">${esc(w.rarity)} · ${esc(job.name)}の初期武器<br>武器種 ${esc(weaponTypeLabel(w.weaponType))} · 攻撃 ${w.basePower}<br>命中 ${w.hit}% · MAIN ${w.mainStat} · ${w.hitCount} HIT<br>MODULE SLOT ${RARITY_SLOTS[w.rarity]}</span></span></label>`).join("");
+  if(kind==="memory")body=`<div class="creation-memory-tabs" aria-label="装備スロット"></div><p class="creation-edit-note">スロットを選び、一覧から装備します。回収個体はCREATE確定時に消費します。</p><div class="creation-memory-catalog"></div>`;
   const editor=document.createElement("div");editor.className="creation-editor";
   editor.innerHTML=`<form class="creation-edit-card" role="dialog" aria-modal="true" aria-labelledby="creationEditorTitle"><h2 id="creationEditorTitle">${titles[kind]}</h2><div class="creation-edit-body">${body}</div><div class="creation-edit-actions"><button type="button" id="cancelCreationEdit">戻る</button><button type="submit" id="confirmCreationEdit">決定</button></div></form>`;
   const view=el.querySelector(".creation-viewport"),opener=el.querySelector(`[data-edit="${kind}"]`);view.inert=true;el.appendChild(editor);
@@ -978,17 +989,25 @@ function openCreationEditor(kind){
       else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
     }
   };
-  function refreshRecoveredDetails(){
-    editor.querySelectorAll("[data-memory-slot]").forEach(node=>{const i=+node.dataset.memorySlot,m=creationMemory(draft,i);node.value=draft.recoveredMemoryIds[i]?`recovered:${draft.recoveredMemoryIds[i]}`:draft.memoryIds[i];editor.querySelector(`[data-recovered-detail="${i}"]`).innerHTML=m?`${esc(recoveredSpec(m))}${m.modules.map(moduleSummary).join("")}`:"";});
+  let selectedMemorySlot=0;
+  function renderMemoryCatalog(){
+    if(kind!=="memory")return;
+    const tabs=editor.querySelector(".creation-memory-tabs"),catalog=editor.querySelector(".creation-memory-catalog");
+    tabs.innerHTML=draft.memoryIds.map((id,i)=>`<button type="button" data-memory-slot="${i}" aria-pressed="${i===selectedMemorySlot}"><small>MEMORY 0${i+1}</small><b>${esc(getMemDef(creationMemory(draft,i)||{definitionId:id})?.name||"未選択")}</b><small>${draft.recoveredMemoryIds[i]?"回収個体":"初期装備"}</small></button>`).join("");
+    const initial=job.startingLoadout.memoryIds.map(id=>{const d=MEMORIES.find(m=>m.id===id);return {definitionId:id,rarity:d.rarity,moduleSlots:RARITY_SLOTS[d.rarity],modules:[],currentCT:0,breakageRate:0,broken:false};});
+    const preview={id:"creation-preview",stats:job.stats,weapon:{modules:[]},memories:draft.memoryIds.map((id,i)=>creationMemory(draft,i)||initial.find(m=>m.definitionId===id)).filter(Boolean)};
+    const group=(title,items,recovered)=>`<h3>${title}</h3>${items.map(m=>{const value=recovered?`recovered:${m.instanceId}`:m.definitionId,chosen=(draft.recoveredMemoryIds[selectedMemorySlot]?`recovered:${draft.recoveredMemoryIds[selectedMemorySlot]}`:draft.memoryIds[selectedMemorySlot])===value;return `<button type="button" class="creation-memory-choice" data-creation-memory="${esc(value)}" aria-pressed="${chosen}"><img src="${memoryIcon(m)}" alt=""><b>${esc(itemName(m))}</b><small>${esc(m.rarity)} · ${getMemDef(m).category} / ${getMemDef(m).execution}</small><div>${memoryTechnicalSpec(preview,m)}<br>CT ${getMemDef(m).ct} · MODULE ${m.modules.length} / ${m.moduleSlots}</div><p>${esc(getMemDef(m).description)}</p>${recovered?`<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""} · 取得深度 ${m.generatedDepth??"未記録"}</p>${m.modules.map(moduleSummary).join("")}`:""}<small>${chosen?"選択中":`MEMORY 0${selectedMemorySlot+1}へ装備`}</small></button>`;}).join("")}`;
+    catalog.innerHTML=group(`${esc(job.name)}の初期メモリ`,initial,false)+group("回収した所持メモリ",state.metaInventory.memories,true)+(state.metaInventory.memories.length?"":`<p class="creation-edit-note">回収したメモリはありません。</p>`);
+    tabs.querySelectorAll("[data-memory-slot]").forEach(b=>b.onclick=()=>{selectedMemorySlot=+b.dataset.memorySlot;renderMemoryCatalog();});
+    catalog.querySelectorAll("[data-creation-memory]").forEach(b=>b.onclick=()=>{setCreationMemory(draft,selectedMemorySlot,b.dataset.creationMemory);renderMemoryCatalog();});
   }
-  refreshRecoveredDetails();
-  editor.querySelectorAll("[data-memory-slot]").forEach(select=>select.onchange=()=>{setCreationMemory(draft,+select.dataset.memorySlot,select.value);refreshRecoveredDetails();});
+  renderMemoryCatalog();
   editor.querySelector("form").onsubmit=e=>{
     e.preventDefault();
     if(kind==="name")draft.name=creationName(editor.querySelector("#nameInput").value);
     if(kind==="job"){
       draft.jobId=editor.querySelector('input[name="creationJob"]:checked')?.value||null;
-      if(!canEquipWeapon(JOBS.find(x=>x.id===draft.jobId),WEAPONS.find(x=>x.id===draft.weaponId)))draft.weaponId=null;
+      normalizeCreationDraft(draft);
     }
     if(kind==="weapon")draft.weaponId=editor.querySelector('input[name="creationWeapon"]:checked')?.value||null;
     state.createDraft=draft;save();close();render();el.querySelector(`[data-edit="${kind}"]`).focus();
