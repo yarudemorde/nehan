@@ -1064,7 +1064,7 @@ When implementing future user instructions:
 ## MAPノード：戦闘・ガレージ・スクラップ — CONFIRMED (2026-10-05)
 
 - Nodeは `{id, side, type, enemyId?, future:[Node, Node]}`。typeはbattle / garage / scrap。Futureは文字列ではなく個体IDとtype（戦闘ならenemyId）を持つ予告。選択後の次MAPは選択したNodeのfutureを左右の選択肢として引き継ぐ。予告は進行操作を行わず種類だけを表示する。
-- `NODE_DEFINITIONS` に日本語名・短縮表示・SVGアイコン・入場処理を登録する。MAP背景と六角形位置は維持し、戦闘の敵名は表示しない。現行 `NODE_WEIGHTS` はbattle 60 / garage 20 / scrap 20。左右と新しい予告は独立抽選し、同じ種類の2択も許可する。
+- `NODE_DEFINITIONS` に日本語名・画像素材の切り出し座標・入場処理を登録する。MAP背景と六角形位置は維持し、ノード内は添付素材の画像のみを表示する。旧SVG・文字ラベルと戦闘の敵名は表示しない。日本語名はaria-labelと長押し詳細に保持する。画像座標の詳細は `docs/MAP_NODE_ART.md` を参照。現行 `NODE_WEIGHTS` はbattle 60 / garage 20 / scrap 20。左右と新しい予告は独立抽選し、同じ種類の2択も許可する。
 - Battleは従来のCombatと敵撃破Loot（MEMORY 20% / MODULE 80%）を維持する。撃破時にはLootを保存してphase=lootへ移行し、回収するまでDepthを増やさない。Winsは撃破時に一度加算する。
 - Garageはphase=garage。修復で `getEffectiveMaxHp(c)` までHP全回復して次MAPへ進む。立ち去る場合もノードを消費して次MAPへ進むがHPは変えない。CT、破損率、BROKEN、Module、装備、SHIELDは変更しない。Homeへ戻ってもphaseを保持し、PLAYから未完了Garageへ復帰する。
 - Scrapはphase=scrap。入場時に `generateScrapLoot(depth)` で一個生成して `run.scrapLoot` を保存し、表示・reloadで再抽選しない。`SCRAP_DROP` はWEAPON 0.5 / MEMORY 0.5、MODULEは含まない。WEAPONS / MEMORIESから定義を抽選し、Instance化してから深度別rarityを設定する。

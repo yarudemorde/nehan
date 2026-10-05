@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=1.4">
+<link rel="stylesheet" href="style.css?v=1.5">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city.webp">
 
@@ -672,9 +672,9 @@ function newRun(char){
 const NODE_WEIGHTS={battle:60,garage:20,scrap:20};
 const SCRAP_DROP={WEAPON:.5,MEMORY:.5};
 const NODE_DEFINITIONS={
-  battle:{label:"戦闘",shortLabel:"戦闘",icon:"assets/map-icon-battle.svg",enter:(node)=>startCombat(node.side)},
-  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:"assets/map-icon-garage.svg",enter:(node,c)=>enterRestNode(c,node,"garage")},
-  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:"assets/map-icon-scrap.svg",enter:(node,c)=>enterRestNode(c,node,"scrap")}
+  battle:{label:"戦闘",shortLabel:"戦闘",icon:"assets/map-node-sheet.webp",iconX:106,enter:(node)=>startCombat(node.side)},
+  garage:{label:"ガレージ",shortLabel:"GARAGE",icon:"assets/map-node-sheet.webp",iconX:586,enter:(node,c)=>enterRestNode(c,node,"garage")},
+  scrap:{label:"スクラップ置き場",shortLabel:"SCRAP",icon:"assets/map-node-sheet.webp",iconX:1066,enter:(node,c)=>enterRestNode(c,node,"scrap")}
 };
 // TODO(要確認): ノード比率とScrapレア度分布の最終バランス。現在は初期実装パラメータ。
 const SCRAP_RARITY_CURVE=[
@@ -744,7 +744,8 @@ function collectScrap(c){
   c.inventory[loot.type==="WEAPON"?"weapons":"memories"].push(loot.item);
   return advanceDepth(c,"scrap");
 }
-function nodeIcon(node){const d=NODE_DEFINITIONS[node.type];return d?.icon?`<img class="map-node-icon" src="${d.icon}" alt="" aria-hidden="true">`:"";}
+// Preserve the supplied sheet unchanged: each CSS window selects a 360 × 426 hex at y=38.
+function nodeIcon(node){const d=NODE_DEFINITIONS[node.type];return d?.icon?`<span class="map-node-art" aria-hidden="true"><img class="map-node-icon" src="${esc(d.icon)}" alt="" width="1536" height="512" style="--sheet-x:${d.iconX/360*100}%"></span>`:"";}
 function nodeLabel(node,short=false){const d=NODE_DEFINITIONS[node.type];return d?(short?d.shortLabel:d.label):"未定義";}
 function renderExploration(c,type){
   const garage=type==="garage",loot=state.run.scrapLoot;
@@ -982,8 +983,8 @@ function renderMap(c){
       <button class="battle-menu" id="exitRun" aria-label="ホームへ戻る"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M5 16h22M5 24h22"/></svg></button>
       <div class="map-nodes" aria-label="進路">
         ${routes.map((r,i)=>{
-          return `<button class="map-node map-choice" data-route="${r.side}" style="--node-x:${i?60.07:24.19}%" data-node-type="${r.type}" aria-label="${esc(nodeLabel(r))}" aria-describedby="actionDescription">${nodeIcon(r)}<span class="map-node-kind">${esc(nodeLabel(r,true))}</span></button>
-            ${r.future.map((n,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" data-node-type="${n.type}" aria-disabled="true" aria-label="次の候補：${esc(nodeLabel(n))}" aria-describedby="actionDescription">${nodeIcon(n)}<span class="map-node-kind">${esc(nodeLabel(n,true))}</span></button>`).join("")}`;
+          return `<button class="map-node map-choice" data-route="${r.side}" style="--node-x:${i?60.07:24.19}%" data-node-type="${r.type}" aria-label="${esc(nodeLabel(r))}" aria-describedby="actionDescription">${nodeIcon(r)}</button>
+            ${r.future.map((n,j)=>`<button class="map-node map-preview" data-preview="${i}-${j}" style="--node-x:${[18.06,35.65,54.4,71.99][i*2+j]}%" data-node-type="${n.type}" aria-disabled="true" aria-label="次の候補：${esc(nodeLabel(n))}" aria-describedby="actionDescription">${nodeIcon(n)}</button>`).join("")}`;
         }).join("")}
       </div>
       <button class="player-status player-health" id="playerDetails" aria-label="モジュール装着画面を開く" aria-describedby="actionDescription">

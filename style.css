@@ -214,13 +214,11 @@ body:has(#app[data-screen="map"]){background:#000}
 .map-node{position:absolute;left:var(--node-x);min-height:0;border:0;background:transparent;color:#eee9e9;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1cqw;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;pointer-events:auto;cursor:pointer;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
 .map-choice{top:44.27%;width:15.97%;height:10.87%}
 .map-preview{top:30.6%;width:10.07%;height:6.64%}
-.map-node-icon{display:block;width:6cqw;height:6cqw;object-fit:contain;image-rendering:pixelated;pointer-events:none}
-.map-preview .map-node-icon{width:4.5cqw;height:4.5cqw}
-.map-node-kind{font-size:3.2cqw;font-weight:700;line-height:1.15;pointer-events:none}
-.map-preview .map-node-kind{font-size:2.6cqw}
-.map-node-name{max-width:95%;font-size:2.3cqw;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;pointer-events:none}
+.map-node-art{position:absolute;inset:0;overflow:hidden;clip-path:inherit;pointer-events:none}
+.map-node-icon{position:absolute;display:block;left:calc(0% - var(--sheet-x));top:-8.9201878%;width:426.6666667%;height:120.1877934%;max-width:none;object-fit:fill;image-rendering:pixelated;pointer-events:none}
 .map-node:focus-visible{outline:0;background:#74212c55}
 .map-choice:active{background:#74212c55}
+.map-node:focus-visible .map-node-art,.map-choice:active .map-node-art{filter:brightness(.8) sepia(.2)}
 .map-equipment .action-icon[aria-disabled="true"] img{opacity:1}
 .map-equipment .action-icon:has(.action-ct) img{opacity:.3}
 
@@ -317,7 +315,7 @@ body:has(#app[data-screen="create"]){background:#000}
 .module-target-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.module-target-heading>div{min-width:0}.module-target-heading #changeMemory{flex:none;font-size:11px}.module-install-header .module-player-heading{max-width:65cqw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(11px,3cqw,13px)}.module-install-guide p{margin:6px 0}.module-install-guide small{color:#cc9b9f}
 .memory-change-overlay{z-index:130;font-family:var(--ui-font)}
 /* Registered map node kinds; the existing hexagon artwork and combat UI stay unchanged. */
-.map-node-kind{white-space:nowrap}.map-node[data-node-type="garage"]{color:#e3ddd4}.map-node[data-node-type="scrap"]{color:#c4b8bb}.map-preview[aria-disabled="true"]{cursor:default}
+.map-preview[aria-disabled="true"]{cursor:default}
 body:has(#app:is([data-screen="garage"],[data-screen="scrap"])){background:#000}
 #app:is([data-screen="garage"],[data-screen="scrap"]){padding:0;background:#000;border:0;box-shadow:none;overflow:hidden}
 #app:is([data-screen="garage"],[data-screen="scrap"]):before{display:none}
