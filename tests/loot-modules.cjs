@@ -67,5 +67,5 @@ vm.runInContext('useMemory(fighter,2);',context);assert.equal(run('fighter.hp'),
 vm.runInContext('state.run.depth=30;state.run.combat.enemy.hp=0;Math.random=()=>.5;',context);assert(run('checkVictory(fighter)'));assert(!run('checkVictory(fighter)'));assert.equal(run('state.run.phase'),'loot');assert.equal(run('state.run.depth'),30);assert.equal(run('state.run.loot.item.generatedDepth'),30);assert.equal(run('state.run.loot.item.effects.length'),4);
 const loot=run('state.run.loot');vm.runInContext('state=load();',context);assert.deepEqual(run('state.run.loot'),loot);assert(run('collectLoot(state.slots[0])'));assert(!run('collectLoot(state.slots[0])'));assert.equal(run('state.run.phase'),'map');assert.equal(run('state.run.depth'),31);assert.deepEqual(run('state.slots[0].inventory.modules.at(-1)'),loot.item);
 assert(!/function (removeModule|uninstallModule|extractModule)/.test(code));
-assert.deepEqual(run('MEMORIES.map(m=>Object.hasOwn(m,"modules"))'),[false,false,false,false]);
+assert(run('MEMORIES.every(m=>!Object.hasOwn(m,"modules"))'));
 console.log('Instance effects, stat/MAX_HP/own-item power, explicit slots/install/overwrite/destruction, HP clamp/no heal, Memory swap, migration, action calculations and loot reload PASS');

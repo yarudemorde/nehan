@@ -186,6 +186,8 @@ body:has(#app[data-screen="combat"]){background:#000}
 .action-description{position:absolute;left:3%;right:3%;bottom:calc(100% + 2cqw);z-index:10;background:#080607ed;border:0;box-shadow:none;padding:2.5cqw;color:#eee9e9;pointer-events:none;font-size:2.8cqw;line-height:1.35}
 .action-description b{font-size:3.5cqw;margin-right:2cqw}.action-description p{margin:1cqw 0}.action-description .tag{font-size:2.5cqw;background:transparent;color:#d7c7c7;border:0;padding:0}.action-description .muted{color:#b7acad}
 .damage-popup{position:absolute;top:20%;left:50%;z-index:4;color:#fff;font-size:8cqw;font-weight:800;text-shadow:2px 2px #851927,-1px -1px #000;pointer-events:none;animation:damage-rise .72s ease-out both}
+.damage-popup.multi-hit{top:calc(12% + var(--hit-index)*11%);left:50%;font-size:6cqw;animation-duration:.5s;animation-delay:calc(var(--hit-index)*.04s)}
+.damage-popup[data-kind="miss"]{color:#ddd;font-size:5.5cqw;text-shadow:1px 1px #000}
 .damage-flash{animation:damage-blink .6s steps(1,end)}
 @keyframes damage-rise{0%{transform:translate(-50%,10px);opacity:1}65%{opacity:1}100%{transform:translate(-50%,-35px);opacity:0}}
 @keyframes damage-blink{0%,40%,80%{opacity:.2}20%,60%,100%{opacity:1}}

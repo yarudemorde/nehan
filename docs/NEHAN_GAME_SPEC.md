@@ -1141,3 +1141,36 @@ When implementing future user instructions:
 - 装着画面内で装備武器・Memoryを選び「装備変更」を押すと、中央一覧から所持武器・Memoryを選んで交換する。同じ画面に留まり、装備変更直後にModule装着を続けられる。
 - 武器は1個、Memoryは4個を維持し、個体全体をStorageと入れ替える。武器の装備制限はcanEquipWeapon()を使用し、旧職業未設定キャラクターは従来どおり全武器を扱える。
 - 装備変更による補正は装備中個体だけを集計。最大HP減少時のみ現在HPをclampし、増加時の自動回復はしない。戦闘中は交換およびModule Install/Overwriteを禁止。保存形式・ドロップ率・戦闘計算式は維持。
+
+
+## 新規Memory M005～M013 — CONFIRMED (2026-10-05)
+
+既存M001～M004の定義、初期4Memory、基本ダメージ式、破損仕様は維持する。新規定義は既存の作成時選択とScrap抽選へ自動参加する。敵memoryPool・敵AI・20% MEMORY / 80% MODULEは変更しない。
+
+| ID | 名前 | カテゴリ | rarity | execution | CT | 効果 |
+|---|---|---|---|---|---|---|
+| M005 | 一閃演算 | 攻撃 | RARE | STANDARD | 5 | POWER 22 / STR / HIT 95% / 1 HIT |
+| M006 | 双牙 | 攻撃 | UNCOMMON | STANDARD | 2 | POWER 8 / DEX / HIT 85% / 2 HIT |
+| M007 | 乱杭 | 攻撃 | RARE | STANDARD | 3 | POWER 5 / DEX / HIT 45% / 5 HIT |
+| M008 | 筋束励起 | バフ | UNCOMMON | INSTANT | 4 | STR +25% / 2 TURN |
+| M009 | 照準同期 | バフ | RARE | INSTANT | 4 | DEX +20%・HIT +15pt / 2 TURN |
+| M010 | 赤熱駆動 | バフ | EPIC | INSTANT | 3 | 次の攻撃Action全HITにBASE POWER +30%、終了時HP -6 |
+| M011 | 積層障壁 | 防御 | COMMON | STANDARD | 2 | POWER 10 / INT参照でSHIELD獲得 |
+| M012 | 衝撃偏向 | 防御 | RARE | INSTANT | 3 | 次の敵Damage Actionを60%軽減 |
+| M013 | 残像回路 | 防御 | EPIC | INSTANT | 4 | 次の敵Damage Actionを65%で完全回避 |
+
+- 攻撃Memoryは`hitCount`回の独立命中判定。各命中HITで`calcScaled()`と`applyEnemyDamage()`を呼び、GUARDを順次削る。旧MemoryのhitCount省略は1。全弾MISSもAction完了としてCT・破損を1回だけ進める。
+- ダメージとMISSは`combat.feedbackEvents[]`へHIT単位で記録し、該当キャラクター画像付近で各数値を別々に表示する。敵連撃も既存合計ダメージの配分を変えず各HITを表示する。数値を合算した単独ポップアップにはしない。
+- `resolveMemoryEffect()`はDefinitionのeffect.typeを見る。effect省略の旧定義は攻撃→ATTACK、回復→HEAL、防御→SHIELDへ対応し、ID分岐は使わない。
+- 一時BUFFは`combat.playerBuffs[]`にsource / type / modifiers / remainingTurns等を保存する。旧Combatは空配列で補完する。Definition・c.statsを変更しない。
+- キャラクター能力は装備中ModuleとCombat Buffのflat/percentを同じ既存集計式へ入力する。`(base + flat合計) × (1 + percent合計/100)`を四捨五入、最低0。
+- 命中率はWeaponと攻撃Memory共通で`baseHit + 一時HIT bonus`、0～100へclampする。hitのDefinitionは変更しない。
+- Memoryの基礎威力ModuleはそのMemoryの全HITへ適用。赤熱駆動はModule適用後の実効基礎威力に+30%を掛けて四捨五入し、既存Stat Scalingへ渡す。反動は攻撃Action終了時に1回のみ。MISSでも消費し、回復・SHIELD・BUFFや攻撃せずターンを進めるだけでは消費しない。
+- 敵Damage Actionの解決順はEvasion→Damage Reduction→SHIELD→HP。回避は成功/失敗どちらでも消費。成功時は軽減・SHIELDを保持。軽減は回避失敗後にAction合計へ1回適用し、その結果を既存の敵HIT数へ分配する。Enemy GUARD・Damage 0では一回限りの防御BUFFを消費しない。既存SHIELD貫通率も維持。
+- 2TURN BUFFは使用時2で保存。敵行動が終了して次Player Turnになる時に1減らし、0で解除する。INSTANT使用だけでは減らない。NEXT系は期限なしで対応Actionまで保持する。
+- CT減少は従来通り次Player Turn開始時に1減らす。破損率はActionごとにランダム+0.0～3.0%、100%でBROKEN。最終使用は効果を解決してから破損させる。
+- 詳細は各HIT威力、命中率、HIT COUNT、BUFF/防御効果、期間、CTを表示。Player名前＋HPの長押しから有効BUFFと残りTURNを確認できる。通常システムフォントを維持。
+- 新規Memoryの画像はカテゴリに対応する既存サンプルSVGを再利用する。武器の多段仕様は今回変更しない。
+
+// TODO(要確認): 同系統BUFFの重複可否。現在は同じsource/typeを再使用すると更新し、累積しない。
+// TODO(要確認): 敵撃破と赤熱駆動の反動による同時死亡の正式勝敗順。現在は通常Player死亡処理を先に評価し、死者にLootを付与しない。
