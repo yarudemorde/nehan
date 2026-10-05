@@ -318,3 +318,13 @@ body:has(#app:is([data-screen="garage"],[data-screen="scrap"])){background:#000}
 .equipment-choice{cursor:pointer;min-height:44px}
 
 .module-install-list-panel>h3{display:flex;align-items:center;justify-content:space-between;gap:4px}.module-install-list-panel>h3 #showModules{font-size:11px;padding:4px;flex:none}
+
+/* Death salvage: only the list scrolls; ownership changes on confirmation. */
+.salvage-screen{height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;color:#eee;background:#080808}
+.salvage-screen header{flex:none}.salvage-screen h2{font-size:20px;margin:4px 0}.salvage-screen header p{margin:4px 0}.salvage-screen header small{font-size:12px;line-height:1.5}
+.salvage-list{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:10px}
+.salvage-list button{flex:none;text-align:left;background:#101010;border:1px solid #666;color:#eee;min-height:44px;padding:12px}
+.salvage-list button[aria-pressed="true"]{border-color:#b85a5a;background:#211515}.salvage-list img{width:44px;height:44px;float:right;object-fit:contain}
+.salvage-actions{flex:none;display:grid;gap:8px}.salvage-actions .btn{min-height:44px;text-align:center}.salvage-actions .btn:disabled{opacity:.4}
+.creation-memory-slots [data-recovered-detail]{display:block;font-size:11px;color:#ddd;line-height:1.4;margin-top:4px}
+.salvage-screen .kicker{color:#ccc}.salvage-actions .btn:hover:not(:disabled){border-color:#ad5555}

@@ -1006,7 +1006,7 @@ When implementing future user instructions:
 - 旧固定効果の例：基礎STR20/DEX20、装備武器に筋力増幅回路、装備破砕に違法筋繊維 → STR28、DEX14。新規個体は保存済みのeffectsで計算する。基礎HP42の仕様は維持し、MAX_HP Moduleによる実効最大HPを別途計算する。
 - INVENTORYはEQUIPPED / STORAGE MEMORIES / STORAGE MODULESを表示し、基礎値→補正値、容量、装着Moduleを確認できる。一覧内部のみスクロールし、下部HOMEと画面全体は固定する。
 - 保存キー `nehan_alpha_v1` を維持する。旧アイテムは欠落していたID・レア度・容量・配列を補完する。既存HP、基礎ステータス、CT、破損状態、装着済みModuleは削除しない。未定義の旧Moduleは表示・保持し、未知の効果を推測して適用しない。
-- 死亡後の共通倉庫への回収、倉庫上限、追加レアドロップ分布、命中率・CT・破損率のModule補正は今回未実装・未確定。既存の死亡・戦闘基本仕様を維持する。
+- 死亡後のMemory回収は後述の消費型Memory Salvageとして実装済み。倉庫上限、追加レアドロップ分布、命中率・CT・破損率のModule補正は未実装・未確定。
 
 
 ## 追加確定仕様：Character / Equipment — CONFIRMED (2026-10-04)
@@ -1174,3 +1174,12 @@ When implementing future user instructions:
 
 // TODO(要確認): 同系統BUFFの重複可否。現在は同じsource/typeを再使用すると更新し、累積しない。
 // TODO(要確認): 敵撃破と赤熱駆動の反動による同時死亡の正式勝敗順。現在は通常Player死亡処理を先に評価し、死者にLootを付与しない。
+
+### CONFIRMED — 消費型Memory Salvage / 2026-10-05
+
+- 死亡画面では装備中・所持中のMemory Instanceから1個だけ選択して回収できる。回収せず終了することもできる。回収確定時に死亡Characterから個体を移動し、`state.metaInventory.memories`へ保存する。残りの所持品はCharacterと共に消失する。報酬・コイン等は今回追加しない。
+- 永久アンロックやコピーではない。Character Creationの4枠で通常DefinitionまたはRecovered Memoryを選択する。Draftは`recoveredMemoryIds[4]`で個体を参照し、選択・編集取消・BACKではStorageから消費しない。CREATE確定でのみ同じオブジェクトを新Characterへ移動し、metaInventoryから削除して1回の保存で確定する。
+- `instanceId`、`definitionId`、`rarity`、`moduleSlots`、`modules`、`breakageRate`、`broken`、`generatedDepth`と追加個体情報を保持する。`currentCT`だけ0へ戻す。BROKEN個体は使用不能のままであり回収で修理しない。
+- 新Characterで通常の破損処理を継続する。再死亡時に自動回収されず、再びSalvageで選択しなければ失われる。同一instanceIdを複数CharacterやmetaInventoryへ重複所有させない。
+- STORAGE_KEYは`nehan_alpha_v1`を維持。旧セーブにmetaInventoryが無い場合は空配列を補完する。既存Characterが所有する個体と重複した回収Storage参照は除外する。回収個体のロード時に性能を再生成しない。
+- UIは黒・白・赤、通常フォント。死亡画面と作成メモリ編集の一覧のみ内部スクロールし、回収・確定・戻るボタンは画面内に維持する。

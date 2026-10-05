@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=1.9">
+<link rel="stylesheet" href="style.css?v=2.0">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city-tall.webp">
 
@@ -643,7 +643,7 @@ let state = load() || freshState();
 const combatResolutionTimers=new WeakMap();
 
 function freshState(){
-  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null, createDraft:null};
+  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null, createDraft:null, metaInventory:{memories:[]}};
 }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function load(){
@@ -685,29 +685,60 @@ function normalizeState(saved){
     if(run.phase==="loot"&&run.lootDepthAdvanced===undefined)run.lootDepthAdvanced=true;
     if(run.scrapLoot){const item=run.scrapLoot.item;normalizeItem(item,run.scrapLoot.type==="MEMORY"?getMemDef(item)?.rarity:"COMMON");}
   }
+  saved.metaInventory??={memories:[]};saved.metaInventory.memories??=[];
+  // Existing ownership wins over a stale recovered-storage entry; never duplicate an instance.
+  const ownedIds=new Set(saved.slots.filter(Boolean).flatMap(c=>[...c.memories,...c.inventory.memories]).map(m=>m.instanceId));
+  const recoveredIds=new Set();
+  saved.metaInventory.memories=saved.metaInventory.memories.filter(m=>{if(!m?.instanceId||!getMemDef(m)||ownedIds.has(m.instanceId)||recoveredIds.has(m.instanceId))return false;recoveredIds.add(m.instanceId);return true;});
   saved.createDraft??=null;
   return saved;
 }
 function newCreationDraft(slotIndex){
-  return {slotIndex,name:"名無し",jobId:JOBS[0].id,weaponId:null,memoryIds:MEMORIES.slice(0,4).map(m=>m.id)};
+  return {slotIndex,name:"名無し",jobId:JOBS[0].id,weaponId:null,memoryIds:MEMORIES.slice(0,4).map(m=>m.id),recoveredMemoryIds:[null,null,null,null]};
 }
 function creationName(value){return Array.from(String(value||"").trim()).slice(0,16).join("")||"名無し";}
+function creationMemory(d,index){
+  const id=d.recoveredMemoryIds?.[index];
+  return id?state.metaInventory?.memories.find(m=>m.instanceId===id):null;
+}
 function validCreationDraft(d){
   if(!d)return false;
   const job=JOBS.find(x=>x.id===d.jobId),weapon=WEAPONS.find(x=>x.id===d.weaponId);
-  return canEquipWeapon(job,weapon)&&Array.isArray(d.memoryIds)&&d.memoryIds.length===4&&new Set(d.memoryIds).size===4&&d.memoryIds.every(id=>MEMORIES.some(m=>m.id===id));
+  if(!canEquipWeapon(job,weapon)||!Array.isArray(d.memoryIds)||d.memoryIds.length!==4||(d.recoveredMemoryIds&&d.recoveredMemoryIds.length!==4))return false;
+  const definitions=d.memoryIds.map((id,i)=>d.recoveredMemoryIds?.[i]?creationMemory(d,i)?.definitionId:id);
+  const recovered=(d.recoveredMemoryIds||[]).filter(Boolean);
+  const owned=state.slots.filter(Boolean).flatMap(c=>[...c.memories,...c.inventory.memories]);
+  return new Set(definitions).size===4&&definitions.every(id=>MEMORIES.some(m=>m.id===id))&&new Set(recovered).size===recovered.length&&!owned.some(m=>recovered.includes(m.instanceId));
 }
+function setCreationMemory(d,index,value){
+  d.recoveredMemoryIds??=[null,null,null,null];
+  const recovered=value.startsWith("recovered:")?state.metaInventory.memories.find(m=>m.instanceId===value.slice(10)):null;
+  if(value.startsWith("recovered:")&&!recovered)return false;
+  const definitionId=recovered?.definitionId||value;
+  if(!MEMORIES.some(m=>m.id===definitionId))return false;
+  // TODO(要確認): 同一MemoryDefinitionの複数装備可否。既存の重複禁止を維持する。
+  const other=d.memoryIds.findIndex((id,i)=>i!==index&&(creationMemory(d,i)?.definitionId||id)===definitionId);
+  if(other>=0){d.memoryIds[other]=d.memoryIds[index];d.recoveredMemoryIds[other]=d.recoveredMemoryIds[index];}
+  d.memoryIds[index]=definitionId;d.recoveredMemoryIds[index]=recovered?.instanceId||null;return true;
+}
+
 function createCharacter(draft){
   if(!validCreationDraft(draft))throw new Error("Invalid character loadout");
   const job=JOBS.find(x=>x.id===draft.jobId),weapon=WEAPONS.find(x=>x.id===draft.weaponId);
   // TODO(要確認): VITから最大HPを算出する正式式。現在は42を維持する。
-  return {
+  const memories=draft.memoryIds.map((id,i)=>creationMemory(draft,i)||createMemoryInstance(id));
+  const recoveredIds=new Set((draft.recoveredMemoryIds||[]).filter(Boolean));
+  // Transfer the exact objects only after all validation and construction succeeded.
+  const character={
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
     name:creationName(draft.name),jobId:job.id,stats:{...job.stats},maxHp:42,hp:42,
     weapon:normalizeItem({...weapon,modules:[]},weapon.rarity),
-    memories:draft.memoryIds.map(createMemoryInstance),inventory:{weapons:[],memories:[],modules:[]},
+    memories,inventory:{weapons:[],memories:[],modules:[]},
     depth:0,wins:0,createdAt:Date.now()
   };
+  state.metaInventory.memories=state.metaInventory.memories.filter(m=>!recoveredIds.has(m.instanceId));
+  memories.forEach(m=>m.currentCT=0);
+  return character;
 }
 
 function calcScaled(base, stat){
@@ -926,13 +957,14 @@ function renderCreate(){
   };
 }
 function openCreationEditor(kind){
-  const d=state.createDraft,draft={...d,memoryIds:[...d.memoryIds]},job=JOBS.find(x=>x.id===draft.jobId);
+  const d=state.createDraft,draft={...d,memoryIds:[...d.memoryIds],recoveredMemoryIds:[...(d.recoveredMemoryIds||[null,null,null,null])]},job=JOBS.find(x=>x.id===draft.jobId);
   const titles={name:"名前",job:"職業",weapon:"武器",memory:"メモリ"};
   let body="";
   if(kind==="name")body=`<label for="nameInput">名前（最大16文字）</label><input id="nameInput" type="text" maxlength="16" autocomplete="off" value="${esc(draft.name)}">`;
   if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}</span></span></label>`).join("");
   if(kind==="weapon")body=WEAPONS.map(w=>`<label class="creation-option"><input type="radio" name="creationWeapon" value="${w.id}" ${draft.weaponId===w.id?"checked":""} ${canEquipWeapon(job,w)?"":"disabled"}><span><b>${esc(w.name)}</b><span class="creation-option-detail">武器種 ${esc(weaponTypeLabel(w.weaponType))} · 攻撃 ${w.basePower}<br>命中 ${w.hit}% · ${w.mainStat} · ${w.hitCount} HIT</span></span></label>`).join("");
-  if(kind==="memory")body=`<div class="creation-memory-slots">${draft.memoryIds.map((id,i)=>`<label>MEMORY 0${i+1}<select data-memory-slot="${i}" aria-label="メモリ${i+1}">${MEMORIES.map(m=>`<option value="${m.id}" ${m.id===id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></label>`).join("")}</div><p class="creation-edit-note">選択済みのメモリを選ぶと、スロットを入れ替えます。</p>`;
+  const recoveredSpec=m=>`${m.rarity} · 破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN":""} · MODULE ${m.modules.length} / ${m.moduleSlots}`;
+  if(kind==="memory")body=`<div class="creation-memory-slots">${draft.memoryIds.map((id,i)=>`<label>MEMORY 0${i+1}<select data-memory-slot="${i}" aria-label="メモリ${i+1}"><optgroup label="通常メモリ">${MEMORIES.map(m=>`<option value="${m.id}" ${!draft.recoveredMemoryIds[i]&&m.id===id?"selected":""}>${esc(m.name)}</option>`).join("")}</optgroup><optgroup label="Recovered Memory / 持ち込みで消費">${state.metaInventory.memories.map(m=>`<option value="recovered:${esc(m.instanceId)}" ${draft.recoveredMemoryIds[i]===m.instanceId?"selected":""}>${esc(itemName(m))} · ${esc(recoveredSpec(m))}</option>`).join("")}</optgroup></select><small data-recovered-detail="${i}"></small></label>`).join("")}</div><p class="creation-edit-note">回収個体は作成確定時だけ移動します。破損・Moduleはそのまま。同名メモリを選ぶとスロットを入れ替えます。</p>`;
   const editor=document.createElement("div");editor.className="creation-editor";
   editor.innerHTML=`<form class="creation-edit-card" role="dialog" aria-modal="true" aria-labelledby="creationEditorTitle"><h2 id="creationEditorTitle">${titles[kind]}</h2><div class="creation-edit-body">${body}</div><div class="creation-edit-actions"><button type="button" id="cancelCreationEdit">戻る</button><button type="submit" id="confirmCreationEdit">決定</button></div></form>`;
   const view=el.querySelector(".creation-viewport"),opener=el.querySelector(`[data-edit="${kind}"]`);view.inert=true;el.appendChild(editor);
@@ -946,13 +978,11 @@ function openCreationEditor(kind){
       else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
     }
   };
-  editor.querySelectorAll("[data-memory-slot]").forEach(select=>select.onchange=()=>{
-    const i=+select.dataset.memorySlot,other=draft.memoryIds.indexOf(select.value),old=draft.memoryIds[i];
-    // TODO(要確認): 同一MemoryDefinitionの複数装備可否。現在は重複禁止。
-    if(other!==-1&&other!==i)draft.memoryIds[other]=old;
-    draft.memoryIds[i]=select.value;
-    editor.querySelectorAll("[data-memory-slot]").forEach(node=>node.value=draft.memoryIds[+node.dataset.memorySlot]);
-  });
+  function refreshRecoveredDetails(){
+    editor.querySelectorAll("[data-memory-slot]").forEach(node=>{const i=+node.dataset.memorySlot,m=creationMemory(draft,i);node.value=draft.recoveredMemoryIds[i]?`recovered:${draft.recoveredMemoryIds[i]}`:draft.memoryIds[i];editor.querySelector(`[data-recovered-detail="${i}"]`).innerHTML=m?`${esc(recoveredSpec(m))}${m.modules.map(moduleSummary).join("")}`:"";});
+  }
+  refreshRecoveredDetails();
+  editor.querySelectorAll("[data-memory-slot]").forEach(select=>select.onchange=()=>{setCreationMemory(draft,+select.dataset.memorySlot,select.value);refreshRecoveredDetails();});
   editor.querySelector("form").onsubmit=e=>{
     e.preventDefault();
     if(kind==="name")draft.name=creationName(editor.querySelector("#nameInput").value);
@@ -1332,19 +1362,24 @@ function endPlayerTurn(c){
   save();render();
 }
 
+function salvageCandidates(c){return [...c.memories,...c.inventory.memories];}
+function completeMemorySalvage(c,instanceId=null){
+  if(state.run?.phase!=="dead"||state.run.ownerId!==c.id||state.slots[state.activeSlot]!==c)return false;
+  const item=instanceId?salvageCandidates(c).find(m=>m.instanceId===instanceId):null;
+  if(instanceId&&(!item||state.metaInventory.memories.some(m=>m.instanceId===instanceId)))return false;
+  if(item){
+    // Move, never clone or regenerate. Unselected possessions disappear with the body.
+    c.memories=c.memories.filter(m=>m!==item);c.inventory.memories=c.inventory.memories.filter(m=>m!==item);
+    item.currentCT=0;state.metaInventory.memories.push(item);
+  }
+  state.slots[state.activeSlot]=null;state.run=null;state.screen="play";save();render();return true;
+}
 function renderDeath(c){
-  el.innerHTML=top()+`
-  <section class="panel">
-    <div class="kicker" style="color:var(--red)">CONNECTION LOST</div>
-    <div class="screen-title">肉体反応、停止。</div>
-    <p>${esc(c.name)} は NEHAN 深度 ${state.run.depth} で消失しました。</p>
-    <p class="muted small">進行度報酬とメモリ回収は確定システムですが、報酬名・回収可能数・選択方式が未確定のためα版ではまだ処理しません。</p>
-    <button class="btn danger" id="confirmDeath"><div class="title">ERASE BODY</div><div class="meta">キャラクタースロットを空にする</div></button>
-  </section>`+footer();
-  document.querySelector("#confirmDeath").onclick=()=>{
-    state.slots[state.activeSlot]=null;
-    state.run=null;state.screen="play";save();render();
-  };
+  let selected=null;
+  el.innerHTML=`<section class="salvage-screen" aria-label="Memory Salvage"><header><p class="kicker">MEMORY SALVAGE</p><h2>肉体反応、停止。</h2><p>${esc(c.name)} / 深度 ${state.run.depth}</p><small>1個だけ回収できます。破損率・Moduleは維持され、次の作成で持ち込むと消費されます。</small></header><div class="salvage-list">${salvageCandidates(c).map(m=>`<button class="inventory-item" data-salvage="${esc(m.instanceId)}" aria-pressed="false"><img src="${memoryIcon(m)}" alt="">${equipmentSummary(m)}<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""}</p></button>`).join("")}</div><div class="salvage-actions"><button class="btn" id="confirmSalvage" disabled>選択したMemoryを回収</button><button class="btn ghost" id="confirmDeath">回収せず消失</button></div></section>`;
+  el.querySelectorAll("[data-salvage]").forEach(b=>b.onclick=()=>{selected=b.dataset.salvage;el.querySelectorAll("[data-salvage]").forEach(n=>n.setAttribute("aria-pressed",String(n===b)));el.querySelector("#confirmSalvage").disabled=false;});
+  el.querySelector("#confirmSalvage").onclick=()=>{if(selected)completeMemorySalvage(c,selected);};
+  el.querySelector("#confirmDeath").onclick=()=>completeMemorySalvage(c);
 }
 
 function moduleEffects(m){
