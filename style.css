@@ -338,3 +338,10 @@ body:has(#app:is([data-screen="garage"],[data-screen="scrap"])){background:#000}
 .creation-memory-tabs :is(b,small),.creation-memory-choice :is(b,small){display:block}.creation-memory-tabs b{font-size:12px}.creation-memory-tabs small{font-size:10px;color:#bbb}
 .creation-memory-tabs button[aria-pressed="true"],.creation-memory-choice[aria-pressed="true"]{border-color:#b96565;background:#251717}
 .creation-memory-catalog{display:grid;gap:8px}.creation-memory-catalog h3{font-size:13px;margin:8px 0 2px}.creation-memory-choice{width:100%;line-height:1.55;font-size:12px}.creation-memory-choice b{font-size:16px}.creation-memory-choice img{width:44px;height:44px;float:right;object-fit:contain}.creation-memory-choice p{margin:6px 0;color:#ddd}
+
+
+.memory-thumbnail{display:block;width:44px;height:44px;object-fit:contain;image-rendering:pixelated;background:#000;margin:0 0 6px}
+.memory-inline-icon{width:20px;height:20px;vertical-align:middle;image-rendering:pixelated;margin-right:4px}
+.creation-memory-value{display:flex;align-items:center;gap:6px}
+.creation-memory-preview{display:flex;gap:3px;min-width:0}
+.creation-memory-preview .memory-thumbnail{width:clamp(20px,6cqw,28px);height:clamp(20px,6cqw,28px);margin:0}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=2.3">
+<link rel="stylesheet" href="style.css?v=2.4">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city-tall.webp">
 
@@ -758,6 +758,9 @@ function calcScaled(base, stat){
 function getMemDef(inst){ return MEMORIES.find(m=>m.id===inst.definitionId); }
 // Shared placeholder resolver; replace only this mapping when new Memory artwork is ready.
 function memoryIcon(inst){const d=getMemDef(inst),index=MEMORIES.indexOf(d);return d.icon||(index<4?`assets/action-${index+1}.svg`:d.category==="攻撃"?"assets/action-1.svg":d.category==="バフ"?"assets/action-2.svg":"assets/action-4.svg");}
+function memoryIconMarkup(inst,className="memory-thumbnail"){
+  return `<img class="${className}" src="${memoryIcon(inst)}" alt="" aria-hidden="true">`;
+}
 function equipmentIcon(item){return `<img class="equipment-icon" src="${getMemDef(item)?memoryIcon(item):"assets/action-weapon.svg"}" alt="" aria-hidden="true">`;}
 
 function newRun(char){
@@ -958,7 +961,7 @@ function renderCreate(){
   const rows=[["name","名前",creationName(d.name)],["job","職業",job?.name||"未選択"],["weapon","武器",weapon?.name||"武器を選択"],["memory","メモリ",`${d.memoryIds.filter(id=>MEMORIES.some(m=>m.id===id)).length} / 4`]];
   el.innerHTML=`<section class="creation-viewport" aria-label="キャラクター作成"><div class="creation-scene">
     <img class="creation-background" src="assets/creation-garage.webp" alt="" aria-hidden="true">
-    <div class="creation-rows">${rows.map(([kind,label,value])=>`<button class="creation-row cut-frame" data-edit="${kind}" aria-label="${label}：${esc(value)}"><span class="creation-row-icon">${creationIcon(kind)}</span><span class="creation-value">${esc(value)}</span><span class="creation-chevron" aria-hidden="true">›</span></button>`).join("")}</div>
+    <div class="creation-rows">${rows.map(([kind,label,value])=>`<button class="creation-row cut-frame" data-edit="${kind}" aria-label="${label}：${esc(value)}"><span class="creation-row-icon">${creationIcon(kind)}</span><span class="creation-value ${kind==="memory"?"creation-memory-value":""}">${kind==="memory"?`<span class="creation-memory-preview">${d.memoryIds.map((id,i)=>memoryIconMarkup(creationMemory(d,i)||{definitionId:id})).join("")}</span>`:""}${esc(value)}</span><span class="creation-chevron" aria-hidden="true">›</span></button>`).join("")}</div>
     <div class="creation-navigation"><button class="cut-frame" id="creationBack" aria-label="戻る"><span aria-hidden="true">‹</span><small>戻る</small></button><button class="cut-frame" id="createBtn" aria-label="作成" ${validCreationDraft(d)?"":"disabled"}><span aria-hidden="true">›</span><small>作成</small></button></div>
   </div></section>`;
   el.querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>openCreationEditor(button.dataset.edit));
@@ -975,7 +978,7 @@ function openCreationEditor(kind){
   const titles={name:"名前",job:"職業",weapon:"武器",memory:"メモリ"};
   let body="";
   if(kind==="name")body=`<label for="nameInput">名前（最大16文字）</label><input id="nameInput" type="text" maxlength="16" autocomplete="off" value="${esc(draft.name)}">`;
-  if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}<br>初期武器：${esc(WEAPONS.find(w=>w.id===j.startingLoadout.weaponId).name)}<br>初期メモリ：${j.startingLoadout.memoryIds.map(id=>esc(getMemDef({definitionId:id}).name)).join(" / ")}</span></span></label>`).join("");
+  if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}<br>初期武器：${esc(WEAPONS.find(w=>w.id===j.startingLoadout.weaponId).name)}<br>初期メモリ：${j.startingLoadout.memoryIds.map(id=>`${memoryIconMarkup({definitionId:id},"memory-inline-icon")}${esc(getMemDef({definitionId:id}).name)}`).join(" / ")}</span></span></label>`).join("");
   if(kind==="weapon")body=WEAPONS.filter(w=>w.id===job.startingLoadout.weaponId).map(w=>`<label class="creation-option"><input type="radio" name="creationWeapon" value="${w.id}" ${draft.weaponId===w.id?"checked":""} ${canEquipWeapon(job,w)?"":"disabled"}><span><b>${esc(w.name)}</b><span class="creation-option-detail">${esc(w.rarity)} · ${esc(job.name)}の初期武器<br>武器種 ${esc(weaponTypeLabel(w.weaponType))} · 攻撃 ${w.basePower}<br>命中 ${w.hit}% · MAIN ${w.mainStat} · ${w.hitCount} HIT<br>MODULE SLOT ${RARITY_SLOTS[w.rarity]}</span></span></label>`).join("");
   if(kind==="memory")body=`<div class="creation-memory-tabs" aria-label="装備スロット"></div><p class="creation-edit-note">スロットを選び、一覧から装備します。回収個体はCREATE確定時に消費します。</p><div class="creation-memory-catalog"></div>`;
   const editor=document.createElement("div");editor.className="creation-editor";
@@ -1582,3 +1585,4 @@ if(window.visualViewport){
 </script>
 </body>
 </html>
+
