@@ -13,11 +13,11 @@ async function reset(ids,options={}){await p.evaluate(({ids,options})=>{const s=
 async function waitFree(){await p.waitForFunction(()=>!JSON.parse(localStorage.getItem('nehan_alpha_v1')).run.combat?.pendingAction);}
 async function hold(selector){const r=await p.locator(selector).boundingBox();await p.mouse.move(r.x+r.width/2,r.y+r.height/2);await p.waitForTimeout(100);await p.mouse.down();await p.locator('#actionDescription:not(.hidden)').waitFor({state:'visible'});}
 await open();
-for(let n=1;n<=13;n++){
- const path=`assets/memories/m${String(n).padStart(3,'0')}.webp`;
- assert(await p.evaluate(async path=>{const img=new Image();img.src=path;await img.decode();return img.naturalWidth===256&&img.naturalHeight===256;},path));
+for(let n=1;n<=4;n++){
+ const path=`assets/action-${n}.svg`;
+ assert(await p.evaluate(async path=>{const img=new Image();img.src=path;await img.decode();return img.naturalWidth>0&&img.naturalHeight>0;},path));
 }
-assert.equal(await p.locator('[data-memory="0"] img').getAttribute('src'),'assets/memories/m007.webp');
+assert.equal(await p.locator('[data-memory="0"] img').getAttribute('src'),'assets/action-1.svg');
 for(const [width,height] of [[320,568],[375,667],[390,844],[393,852],[430,932]]){
  await p.setViewportSize({width,height});await p.waitForTimeout(100);assert(await p.evaluate(()=>document.documentElement.scrollHeight===innerHeight&&document.documentElement.scrollWidth===innerWidth));assert.equal(await p.locator('.action-icons .action-icon').count(),5);await hold('[data-memory="0"]');const text=await p.locator('#actionDescription').innerText();assert(text.includes('HIT COUNT 5')&&text.includes('45% × 5')&&!/undefined|NaN/.test(text));await p.mouse.up();await p.locator('#playerDetails').click();await p.locator('[data-install-target="memory-1"]').click();const detail=p.locator('.module-install-detail'),t=await detail.innerText();assert(t.includes('DEX +20%')&&t.includes('HIT +15pt')&&t.includes('2 TURN')&&!/undefined|NaN/.test(t));const g=await detail.evaluate(e=>({end:e.querySelector('.module-selected-slot').getBoundingClientRect().bottom,panel:e.getBoundingClientRect().bottom}));assert(g.end<=g.panel+1);await p.locator('.module-install-back').click();console.log(width,height,'new details/icons and readable buff workbench PASS');
 }

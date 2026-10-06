@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=2.2">
+<link rel="stylesheet" href="style.css?v=2.3">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city-tall.webp">
 
@@ -756,11 +756,9 @@ function calcScaled(base, stat){
   return Math.max(1, Math.round(base * (1 + Math.sqrt(Math.max(0,stat)) * 0.12)));
 }
 function getMemDef(inst){ return MEMORIES.find(m=>m.id===inst.definitionId); }
-const MEMORY_ICONS = Object.freeze(Object.fromEntries(Array.from({length:13},(_,i)=>{
-  const id=`M${String(i+1).padStart(3,"0")}`;
-  return [id,`assets/memories/${id.toLowerCase()}.webp`];
-})));
-function memoryIcon(inst){const d=getMemDef(inst),index=MEMORIES.indexOf(d);return d.icon||MEMORY_ICONS[d.id]||(index<4?`assets/action-${index+1}.svg`:d.category==="攻撃"?"assets/action-1.svg":d.category==="バフ"?"assets/action-2.svg":"assets/action-4.svg");}
+// Shared placeholder resolver; replace only this mapping when new Memory artwork is ready.
+function memoryIcon(inst){const d=getMemDef(inst),index=MEMORIES.indexOf(d);return d.icon||(index<4?`assets/action-${index+1}.svg`:d.category==="攻撃"?"assets/action-1.svg":d.category==="バフ"?"assets/action-2.svg":"assets/action-4.svg");}
+function equipmentIcon(item){return `<img class="equipment-icon" src="${getMemDef(item)?memoryIcon(item):"assets/action-weapon.svg"}" alt="" aria-hidden="true">`;}
 
 function newRun(char){
   char.hp = getEffectiveMaxHp(char);
@@ -997,7 +995,7 @@ function openCreationEditor(kind){
   function renderMemoryCatalog(){
     if(kind!=="memory")return;
     const tabs=editor.querySelector(".creation-memory-tabs"),catalog=editor.querySelector(".creation-memory-catalog");
-    tabs.innerHTML=draft.memoryIds.map((id,i)=>`<button type="button" data-memory-slot="${i}" aria-pressed="${i===selectedMemorySlot}"><small>MEMORY 0${i+1}</small><b>${esc(getMemDef(creationMemory(draft,i)||{definitionId:id})?.name||"未選択")}</b><small>${draft.recoveredMemoryIds[i]?"回収個体":"初期装備"}</small></button>`).join("");
+    tabs.innerHTML=draft.memoryIds.map((id,i)=>`<button type="button" data-memory-slot="${i}" aria-pressed="${i===selectedMemorySlot}">${equipmentIcon(creationMemory(draft,i)||{definitionId:id})}<small>MEMORY 0${i+1}</small><b>${esc(getMemDef(creationMemory(draft,i)||{definitionId:id})?.name||"未選択")}</b><small>${draft.recoveredMemoryIds[i]?"回収個体":"初期装備"}</small></button>`).join("");
     const initial=job.startingLoadout.memoryIds.map(id=>{const d=MEMORIES.find(m=>m.id===id);return {definitionId:id,rarity:d.rarity,moduleSlots:RARITY_SLOTS[d.rarity],modules:[],currentCT:0,breakageRate:0,broken:false};});
     const preview={id:"creation-preview",stats:job.stats,weapon:{modules:[]},memories:draft.memoryIds.map((id,i)=>creationMemory(draft,i)||initial.find(m=>m.definitionId===id)).filter(Boolean)};
     const group=(title,items,recovered)=>`<h3>${title}</h3>${items.map(m=>{const value=recovered?`recovered:${m.instanceId}`:m.definitionId,chosen=(draft.recoveredMemoryIds[selectedMemorySlot]?`recovered:${draft.recoveredMemoryIds[selectedMemorySlot]}`:draft.memoryIds[selectedMemorySlot])===value;return `<button type="button" class="creation-memory-choice" data-creation-memory="${esc(value)}" aria-pressed="${chosen}"><img src="${memoryIcon(m)}" alt=""><b>${esc(itemName(m))}</b><small>${esc(m.rarity)} · ${getMemDef(m).category} / ${getMemDef(m).execution}</small><div>${memoryTechnicalSpec(preview,m)}<br>CT ${getMemDef(m).ct} · MODULE ${m.modules.length} / ${m.moduleSlots}</div><p>${esc(getMemDef(m).description)}</p>${recovered?`<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""} · 取得深度 ${m.generatedDepth??"未記録"}</p>${m.modules.map(moduleSummary).join("")}`:""}<small>${chosen?"選択中":`MEMORY 0${selectedMemorySlot+1}へ装備`}</small></button>`;}).join("")}`;
@@ -1399,7 +1397,7 @@ function completeMemorySalvage(c,instanceId=null){
 }
 function renderDeath(c){
   let selected=null;
-  el.innerHTML=`<section class="salvage-screen" aria-label="Memory Salvage"><header><p class="kicker">MEMORY SALVAGE</p><h2>肉体反応、停止。</h2><p>${esc(c.name)} / 深度 ${state.run.depth}</p><small>1個だけ回収できます。破損率・Moduleは維持され、次の作成で持ち込むと消費されます。</small></header><div class="salvage-list">${salvageCandidates(c).map(m=>`<button class="inventory-item" data-salvage="${esc(m.instanceId)}" aria-pressed="false"><img src="${memoryIcon(m)}" alt="">${equipmentSummary(m)}<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""}</p></button>`).join("")}</div><div class="salvage-actions"><button class="btn" id="confirmSalvage" disabled>選択したMemoryを回収</button><button class="btn ghost" id="confirmDeath">回収せず消失</button></div></section>`;
+  el.innerHTML=`<section class="salvage-screen" aria-label="Memory Salvage"><header><p class="kicker">MEMORY SALVAGE</p><h2>肉体反応、停止。</h2><p>${esc(c.name)} / 深度 ${state.run.depth}</p><small>1個だけ回収できます。破損率・Moduleは維持され、次の作成で持ち込むと消費されます。</small></header><div class="salvage-list">${salvageCandidates(c).map(m=>`<button class="inventory-item" data-salvage="${esc(m.instanceId)}" aria-pressed="false">${equipmentSummary(m)}<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""}</p></button>`).join("")}</div><div class="salvage-actions"><button class="btn" id="confirmSalvage" disabled>選択したMemoryを回収</button><button class="btn ghost" id="confirmDeath">回収せず消失</button></div></section>`;
   el.querySelectorAll("[data-salvage]").forEach(b=>b.onclick=()=>{selected=b.dataset.salvage;el.querySelectorAll("[data-salvage]").forEach(n=>n.setAttribute("aria-pressed",String(n===b)));el.querySelector("#confirmSalvage").disabled=false;});
   el.querySelector("#confirmSalvage").onclick=()=>{if(selected)completeMemorySalvage(c,selected);};
   el.querySelector("#confirmDeath").onclick=()=>completeMemorySalvage(c);
@@ -1410,7 +1408,7 @@ function moduleEffects(m){
 }
 function itemName(item){return item.name||getMemDef(item)?.name||"未設定";}
 function moduleSummary(m){const d=getModuleDef(m);return `<b>${esc(d?.name||m.definitionId||"旧モジュール")}</b><small>${esc(m.rarity||d?.rarity||"未設定")} · 取得深度 ${m.generatedDepth??"未記録"}</small><div class="module-effect-lines">${moduleEffects(m)}</div>`;}
-function equipmentSummary(item){return `<b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · MODULE ${item.modules.length}/${item.moduleSlots}</small>${item.modules.map((m,i)=>`<div class="installed-module"><small>SLOT ${(m.slotIndex??i)+1}</small>${moduleSummary(m)}</div>`).join("")}`;}
+function equipmentSummary(item){return `<div class="equipment-summary-heading">${equipmentIcon(item)}<div><b>${esc(itemName(item))}</b><small>${esc(item.rarity)} · MODULE ${item.modules.length}/${item.moduleSlots}</small></div></div>${item.modules.map((m,i)=>`<div class="installed-module"><small>SLOT ${(m.slotIndex??i)+1}</small>${moduleSummary(m)}</div>`).join("")}`;}
 function renderLoot(c){
   const loot=state.run.loot;
   if(!loot)return;
