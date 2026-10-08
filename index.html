@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
 <title>NEHAN // ALPHA</title>
-<link rel="stylesheet" href="style.css?v=2.4">
+<link rel="stylesheet" href="style.css?v=2.5">
 <link rel="preload" as="image" href="assets/studio_logo.png">
 <link rel="preload" as="image" href="assets/home-city-tall.webp">
 
@@ -505,6 +505,12 @@ function createMemoryInstance(definitionId){
   const d=MEMORIES.find(x=>x.id===definitionId);
   return normalizeItem({definitionId,currentCT:0,breakageRate:0,broken:false,modules:[]},d.rarity);
 }
+function normalizeSavedMemory(m){
+  const slots=m.moduleSlots;normalizeItem(m,getMemDef(m)?.rarity);
+  // Existing individual capacities survive transfer/reload; missing legacy capacity follows rarity.
+  if(Number.isInteger(slots)&&slots>=1&&slots<=5)m.moduleSlots=slots;
+  m.currentCT??=0;return m;
+}
 function weightedChoice(entries,rng){
   const total=entries.reduce((n,e)=>n+e.weight,0);let roll=rng()*total;
   for(const e of entries){roll-=e.weight;if(roll<0)return e.value;}
@@ -639,12 +645,13 @@ function collectLoot(c){
 }
 
 const STORAGE_KEY = "nehan_alpha_v1";
+const DEATH_MEMORY_RECOVERY_COUNT = 1;
 const el = document.querySelector("#app");
 let state = load() || freshState();
 const combatResolutionTimers=new WeakMap();
 
 function freshState(){
-  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null, createDraft:null, metaInventory:{memories:[]}};
+  return {slots:[null,null,null], activeSlot:null, screen:"home", run:null, createDraft:null, creationEditor:null, metaInventory:{memories:[]}};
 }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function load(){
@@ -663,7 +670,7 @@ function normalizeState(saved){
     // Preserve every legacy stat, HP value, Memory state and installed Module.
     c.jobId??="LEGACY";
     c.inventory??={weapons:[],memories:[],modules:[]};c.inventory.weapons??=[];c.inventory.memories??=[];c.inventory.modules??=[];
-    [...c.memories,...c.inventory.memories].forEach(m=>normalizeItem(m,getMemDef(m)?.rarity));
+    [...c.memories,...c.inventory.memories].forEach(normalizeSavedMemory);
     c.inventory.modules.forEach(normalizeModule);
     for(const w of [c.weapon,...c.inventory.weapons].filter(Boolean)){
       w.mainStat??="STR";w.hitCount??=1;w.weaponType??="LEGACY";normalizeItem(w,"COMMON");
@@ -691,8 +698,15 @@ function normalizeState(saved){
   const ownedIds=new Set(saved.slots.filter(Boolean).flatMap(c=>[...c.memories,...c.inventory.memories]).map(m=>m.instanceId));
   const recoveredIds=new Set();
   saved.metaInventory.memories=saved.metaInventory.memories.filter(m=>{if(!m?.instanceId||!getMemDef(m)||ownedIds.has(m.instanceId)||recoveredIds.has(m.instanceId))return false;recoveredIds.add(m.instanceId);return true;});
+  saved.metaInventory.memories.forEach(m=>{
+    // Migrate missing fields without changing an archived individual's saved capacity.
+    normalizeSavedMemory(m);
+    m.currentCT=0;
+  });
   saved.createDraft??=null;
   if(saved.createDraft)normalizeCreationDraft(saved.createDraft,saved);
+  if(saved.creationEditor?.kind==="memory"&&saved.creationEditor.draft?.slotIndex===saved.createDraft?.slotIndex)normalizeCreationDraft(saved.creationEditor.draft,saved);
+  else saved.creationEditor=null;
   return saved;
 }
 function normalizeCreationDraft(d,owner=state){
@@ -747,9 +761,24 @@ function createCharacter(draft){
     memories,inventory:{weapons:[],memories:[],modules:[]},
     depth:0,wins:0,createdAt:Date.now()
   };
+  character.hp=getEffectiveMaxHp(character);
   state.metaInventory.memories=state.metaInventory.memories.filter(m=>!recoveredIds.has(m.instanceId));
   memories.forEach(m=>m.currentCT=0);
   return character;
+}
+function commitCharacterCreation(draft,slotIndex=state.activeSlot){
+  if(!Number.isInteger(slotIndex)||slotIndex!==state.activeSlot||slotIndex<0||slotIndex>=ALPHA.maxSlots||state.slots[slotIndex]||(draft?.slotIndex!==undefined&&draft.slotIndex!==slotIndex)||!validCreationDraft(draft))return false;
+  const before={archive:state.metaInventory.memories,run:state.run,screen:state.screen,draft:state.createDraft,editor:state.creationEditor};
+  const ct=before.archive.map(m=>[m,m.currentCT]);
+  try{
+    const c=createCharacter(draft);state.slots[slotIndex]=c;state.createDraft=null;state.creationEditor=null;
+    state.run=newRun(c);state.run.ownerId=c.id;state.screen="run";save();
+  }catch(error){
+    state.slots[slotIndex]=null;state.metaInventory.memories=before.archive;
+    state.run=before.run;state.screen=before.screen;state.createDraft=before.draft;state.creationEditor=before.editor;
+    ct.forEach(([m,value])=>m.currentCT=value);return false;
+  }
+  render();return true;
 }
 
 function calcScaled(base, stat){
@@ -967,15 +996,14 @@ function renderCreate(){
   el.querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>openCreationEditor(button.dataset.edit));
   el.querySelector("#creationBack").onclick=()=>{state.screen="play";save();render();};
   el.querySelector("#createBtn").onclick=()=>{
-    if(!validCreationDraft(state.createDraft)||state.slots[state.activeSlot])return;
-    const c=createCharacter(state.createDraft);
-    state.slots[state.activeSlot]=c;state.createDraft=null;
-    state.run=newRun(c);state.run.ownerId=c.id;state.screen="run";save();render();
+    if(!commitCharacterCreation(state.createDraft))el.querySelector("#createBtn").setAttribute("aria-label","作成できません。保存容量と選択内容を確認してください。");
   };
+  if(state.creationEditor?.kind==="memory"&&state.creationEditor.draft.slotIndex===d.slotIndex)openCreationEditor("memory");
 }
 function openCreationEditor(kind){
-  const d=state.createDraft,draft={...d,memoryIds:[...d.memoryIds],recoveredMemoryIds:[...(d.recoveredMemoryIds||[null,null,null,null])]},job=JOBS.find(x=>x.id===draft.jobId);
-  const titles={name:"名前",job:"職業",weapon:"武器",memory:"メモリ"};
+  const d=state.createDraft,resumed=kind==="memory"&&state.creationEditor?.draft?.slotIndex===d.slotIndex?state.creationEditor:null;
+  const draft=resumed?.draft||{...d,memoryIds:[...d.memoryIds],recoveredMemoryIds:[...(d.recoveredMemoryIds||[null,null,null,null])]},job=JOBS.find(x=>x.id===draft.jobId);
+  const titles={name:"名前",job:"職業",weapon:"武器",memory:"MEMORY LOADOUT"};
   let body="";
   if(kind==="name")body=`<label for="nameInput">名前（最大16文字）</label><input id="nameInput" type="text" maxlength="16" autocomplete="off" value="${esc(draft.name)}">`;
   if(kind==="job")body=JOBS.map(j=>`<label class="creation-option"><input type="radio" name="creationJob" value="${j.id}" ${draft.jobId===j.id?"checked":""}><span><b>${esc(j.name)}</b><span class="creation-option-detail">${Object.entries(j.stats).map(([k,v])=>`${k} ${v}`).join(" / ")}<br>MAIN ${j.primaryStat} · SUB ${j.secondaryStat}<br>${esc(j.ability.name)}<br>${esc(j.ability.description)}<br>初期武器：${esc(WEAPONS.find(w=>w.id===j.startingLoadout.weaponId).name)}<br>初期メモリ：${j.startingLoadout.memoryIds.map(id=>`${memoryIconMarkup({definitionId:id},"memory-inline-icon")}${esc(getMemDef({definitionId:id}).name)}`).join(" / ")}</span></span></label>`).join("");
@@ -984,7 +1012,7 @@ function openCreationEditor(kind){
   const editor=document.createElement("div");editor.className="creation-editor";
   editor.innerHTML=`<form class="creation-edit-card" role="dialog" aria-modal="true" aria-labelledby="creationEditorTitle"><h2 id="creationEditorTitle">${titles[kind]}</h2><div class="creation-edit-body">${body}</div><div class="creation-edit-actions"><button type="button" id="cancelCreationEdit">戻る</button><button type="submit" id="confirmCreationEdit">決定</button></div></form>`;
   const view=el.querySelector(".creation-viewport"),opener=el.querySelector(`[data-edit="${kind}"]`);view.inert=true;el.appendChild(editor);
-  function close(){editor.remove();view.inert=false;opener.focus();}
+  function close(){if(kind==="memory"){state.creationEditor=null;save();}editor.remove();view.inert=false;opener.focus();}
   editor.querySelector("#cancelCreationEdit").onclick=close;
   editor.onkeydown=e=>{
     if(e.key==="Escape"){e.preventDefault();close();}
@@ -994,18 +1022,20 @@ function openCreationEditor(kind){
       else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
     }
   };
-  let selectedMemorySlot=0;
+  let selectedMemorySlot=resumed?.selectedSlot||0;
+  function persistMemoryEditor(){if(kind==="memory"){state.creationEditor={kind,draft,selectedSlot:selectedMemorySlot};save();}}
   function renderMemoryCatalog(){
     if(kind!=="memory")return;
     const tabs=editor.querySelector(".creation-memory-tabs"),catalog=editor.querySelector(".creation-memory-catalog");
     tabs.innerHTML=draft.memoryIds.map((id,i)=>`<button type="button" data-memory-slot="${i}" aria-pressed="${i===selectedMemorySlot}">${equipmentIcon(creationMemory(draft,i)||{definitionId:id})}<small>MEMORY 0${i+1}</small><b>${esc(getMemDef(creationMemory(draft,i)||{definitionId:id})?.name||"未選択")}</b><small>${draft.recoveredMemoryIds[i]?"回収個体":"初期装備"}</small></button>`).join("");
     const initial=job.startingLoadout.memoryIds.map(id=>{const d=MEMORIES.find(m=>m.id===id);return {definitionId:id,rarity:d.rarity,moduleSlots:RARITY_SLOTS[d.rarity],modules:[],currentCT:0,breakageRate:0,broken:false};});
     const preview={id:"creation-preview",stats:job.stats,weapon:{modules:[]},memories:draft.memoryIds.map((id,i)=>creationMemory(draft,i)||initial.find(m=>m.definitionId===id)).filter(Boolean)};
-    const group=(title,items,recovered)=>`<h3>${title}</h3>${items.map(m=>{const value=recovered?`recovered:${m.instanceId}`:m.definitionId,chosen=(draft.recoveredMemoryIds[selectedMemorySlot]?`recovered:${draft.recoveredMemoryIds[selectedMemorySlot]}`:draft.memoryIds[selectedMemorySlot])===value;return `<button type="button" class="creation-memory-choice" data-creation-memory="${esc(value)}" aria-pressed="${chosen}"><img src="${memoryIcon(m)}" alt=""><b>${esc(itemName(m))}</b><small>${esc(m.rarity)} · ${getMemDef(m).category} / ${getMemDef(m).execution}</small><div>${memoryTechnicalSpec(preview,m)}<br>CT ${getMemDef(m).ct} · MODULE ${m.modules.length} / ${m.moduleSlots}</div><p>${esc(getMemDef(m).description)}</p>${recovered?`<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""} · 取得深度 ${m.generatedDepth??"未記録"}</p>${m.modules.map(moduleSummary).join("")}`:""}<small>${chosen?"選択中":`MEMORY 0${selectedMemorySlot+1}へ装備`}</small></button>`;}).join("")}`;
-    catalog.innerHTML=group(`${esc(job.name)}の初期メモリ`,initial,false)+group("回収した所持メモリ",state.metaInventory.memories,true)+(state.metaInventory.memories.length?"":`<p class="creation-edit-note">回収したメモリはありません。</p>`);
-    tabs.querySelectorAll("[data-memory-slot]").forEach(b=>b.onclick=()=>{selectedMemorySlot=+b.dataset.memorySlot;renderMemoryCatalog();});
-    catalog.querySelectorAll("[data-creation-memory]").forEach(b=>b.onclick=()=>{setCreationMemory(draft,selectedMemorySlot,b.dataset.creationMemory);renderMemoryCatalog();});
+    const group=(title,items,recovered)=>`<h3>${title}</h3>${items.map(m=>{const value=recovered?`recovered:${m.instanceId}`:m.definitionId,chosen=(draft.recoveredMemoryIds[selectedMemorySlot]?`recovered:${draft.recoveredMemoryIds[selectedMemorySlot]}`:draft.memoryIds[selectedMemorySlot])===value;return `<button type="button" class="creation-memory-choice ${recovered?"recovered-choice":""}" data-creation-memory="${esc(value)}" aria-pressed="${chosen}"><img src="${memoryIcon(m)}" alt="">${recovered?`<small class="recovered-label">RECOVERED / 回収記憶</small>`:""}<b>${esc(itemName(m))}</b><small>${esc(m.rarity)} · ${getMemDef(m).category} / ${getMemDef(m).execution}</small><div>${memoryTechnicalSpec(preview,m)}<br>CT ${getMemDef(m).ct} · MODULE ${m.modules.length} / ${m.moduleSlots}</div><p>${esc(getMemDef(m).description)}</p>${recovered?`<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""} · 取得深度 ${m.generatedDepth??"未記録"}</p>${m.modules.map(moduleSummary).join("")}`:""}<small>${chosen?"選択中":`MEMORY 0${selectedMemorySlot+1}へ装備`}</small></button>`;}).join("")}`;
+    catalog.innerHTML=group(`STANDARD MEMORY / ${esc(job.name)}の初期メモリ`,initial,false)+group("RECOVERED MEMORY / 回収記憶",state.metaInventory.memories,true)+(state.metaInventory.memories.length?"":`<p class="creation-edit-note">回収したメモリはありません。</p>`);
+    tabs.querySelectorAll("[data-memory-slot]").forEach(b=>b.onclick=()=>{selectedMemorySlot=+b.dataset.memorySlot;persistMemoryEditor();renderMemoryCatalog();});
+    catalog.querySelectorAll("[data-creation-memory]").forEach(b=>b.onclick=()=>{setCreationMemory(draft,selectedMemorySlot,b.dataset.creationMemory);persistMemoryEditor();renderMemoryCatalog();});
   }
+  persistMemoryEditor();
   renderMemoryCatalog();
   editor.querySelector("form").onsubmit=e=>{
     e.preventDefault();
@@ -1386,24 +1416,68 @@ function endPlayerTurn(c){
   save();render();
 }
 
-function salvageCandidates(c){return [...c.memories,...c.inventory.memories];}
+function salvageCandidates(c){
+  const ids=new Set();return [...c.memories,...(c.inventory?.memories||[])].filter(m=>getMemDef(m)&&m.instanceId&&!ids.has(m.instanceId)&&ids.add(m.instanceId));
+}
 function completeMemorySalvage(c,instanceId=null){
-  if(state.run?.phase!=="dead"||state.run.ownerId!==c.id||state.slots[state.activeSlot]!==c)return false;
+  if(DEATH_MEMORY_RECOVERY_COUNT!==1||state.run?.phase!=="dead"||state.run.ownerId!==c.id||state.slots[state.activeSlot]!==c||c.hp>0||(instanceId!==null&&typeof instanceId!=="string"))return false;
   const item=instanceId?salvageCandidates(c).find(m=>m.instanceId===instanceId):null;
   if(instanceId&&(!item||state.metaInventory.memories.some(m=>m.instanceId===instanceId)))return false;
+  if(item&&state.slots.some(other=>other&&other!==c&&salvageCandidates(other).some(m=>m.instanceId===instanceId)))return false;
+  const before={memories:c.memories,storage:c.inventory.memories,archive:state.metaInventory.memories,run:state.run,screen:state.screen,editor:state.creationEditor,ct:item?.currentCT};
   if(item){
     // Move, never clone or regenerate. Unselected possessions disappear with the body.
     c.memories=c.memories.filter(m=>m!==item);c.inventory.memories=c.inventory.memories.filter(m=>m!==item);
-    item.currentCT=0;state.metaInventory.memories.push(item);
+    item.currentCT=0;state.metaInventory.memories=[...state.metaInventory.memories,item];
   }
-  state.slots[state.activeSlot]=null;state.run=null;state.screen="play";save();render();return true;
+  state.slots[state.activeSlot]=null;state.run=null;state.screen="play";state.creationEditor=null;
+  try{save();}catch(error){
+    state.slots[state.activeSlot]=c;state.run=before.run;state.screen=before.screen;state.creationEditor=before.editor;
+    c.memories=before.memories;c.inventory.memories=before.storage;state.metaInventory.memories=before.archive;
+    if(item)item.currentCT=before.ct;return false;
+  }
+  render();return true;
+}
+function recoverMemoryFromDeadCharacter(characterId,instanceId){
+  const c=state.slots[state.activeSlot];return !!c&&c.id===characterId&&completeMemorySalvage(c,instanceId);
 }
 function renderDeath(c){
-  let selected=null;
-  el.innerHTML=`<section class="salvage-screen" aria-label="Memory Salvage"><header><p class="kicker">MEMORY SALVAGE</p><h2>肉体反応、停止。</h2><p>${esc(c.name)} / 深度 ${state.run.depth}</p><small>1個だけ回収できます。破損率・Moduleは維持され、次の作成で持ち込むと消費されます。</small></header><div class="salvage-list">${salvageCandidates(c).map(m=>`<button class="inventory-item" data-salvage="${esc(m.instanceId)}" aria-pressed="false">${equipmentSummary(m)}<p>破損率 ${Number(m.breakageRate).toFixed(2)}%${m.broken?" · BROKEN / 使用不能":""}</p></button>`).join("")}</div><div class="salvage-actions"><button class="btn" id="confirmSalvage" disabled>選択したMemoryを回収</button><button class="btn ghost" id="confirmDeath">回収せず消失</button></div></section>`;
-  el.querySelectorAll("[data-salvage]").forEach(b=>b.onclick=()=>{selected=b.dataset.salvage;el.querySelectorAll("[data-salvage]").forEach(n=>n.setAttribute("aria-pressed",String(n===b)));el.querySelector("#confirmSalvage").disabled=false;});
-  el.querySelector("#confirmSalvage").onclick=()=>{if(selected)completeMemorySalvage(c,selected);};
-  el.querySelector("#confirmDeath").onclick=()=>completeMemorySalvage(c);
+  const flow=state.run.salvage??={opened:false,selectedInstanceId:null};
+  if(flow.opened)return renderMemorySalvage(c);
+  el.innerHTML=`<section class="salvage-screen connection-lost"><header><p class="kicker">CONNECTION LOST / 接続断</p><h2>肉体反応、停止。</h2><p>${esc(c.name)} / DEPTH ${state.run.depth}</p></header><div class="death-transmission"><p>記憶領域への最終アクセスを確認。</p><p>${salvageCandidates(c).length?"回収可能なMemoryを検出。":"回収可能なMemoryはありません。"}</p></div><div class="salvage-actions"><button class="btn" id="openSalvage">MEMORY SALVAGE / 記憶回収</button><button class="btn ghost" id="confirmDeath">回収せず終了</button></div></section>`;
+  el.querySelector("#openSalvage").onclick=()=>{flow.opened=true;save();render();};
+  el.querySelector("#confirmDeath").onclick=()=>confirmMemoryRecovery(c,null);
+}
+function memorySalvageSummary(m){const d=getMemDef(m);return `${equipmentSummary(m)}<small>${esc(d.category)} / ${d.execution}</small><p>破損率 ${Number(m.breakageRate).toFixed(2)}% · ${m.broken?"BROKEN / 使用不能":"ACTIVE"}</p>`;}
+function memoryArchiveDetails(c,m){
+  const d=getMemDef(m),preview=c||{id:"archive-preview",stats:{VIT:0,STR:0,DEX:0,INT:0},weapon:{modules:[]},memories:[]};
+  return `${memorySalvageSummary(m)}<p>${memoryTechnicalSpec(preview,m)}<br>MAIN ${d.main||"—"}<br>CT ${m.currentCT||0} / ${d.ct}<br>取得深度 ${m.generatedDepth??"未記録"}</p><p>${esc(d.description)}</p><h4>MODULE ${m.modules.length} / ${m.moduleSlots}</h4>${Array.from({length:m.moduleSlots},(_,slot)=>{const module=moduleAtSlot(m,slot);return `<div class="archive-module-slot"><small>SLOT ${slot+1}</small>${module?moduleSummary(module):"EMPTY"}</div>`;}).join("")}`;
+}
+function openMemoryArchiveDetails(c,m){
+  const dialog=equipmentDialog("memory-archive-detail","MEMORY DETAIL");dialog.body.innerHTML=memoryArchiveDetails(c,m);dialog.overlay.querySelector(".equipment-dialog-close").focus();
+}
+function confirmMemoryRecovery(c,instanceId){
+  const item=instanceId?salvageCandidates(c).find(m=>m.instanceId===instanceId):null;
+  if(instanceId&&!item)return;
+  const dialog=equipmentDialog("salvage-confirm",item?"RECOVER / 記憶回収":"BODY LOST / 義体消失");
+  dialog.body.innerHTML=`${item?memorySalvageSummary(item):""}<p>${item?"このMemoryを回収します。他のMemoryと装備は身体と共に失われます。":"回収せず終了します。すべてのMemoryと装備が身体と共に失われます。"}</p><p class="negative">この操作は元に戻せません。</p><button class="btn" id="commitRecovery">${item?"RECOVER":"BODY LOST"}</button><p role="status" id="recoveryError"></p>`;
+  dialog.overlay.querySelector(".equipment-dialog-close").textContent="CANCEL";
+  let committed=false;
+  dialog.body.querySelector("#commitRecovery").onclick=e=>{
+    if(committed)return;committed=true;e.currentTarget.disabled=true;
+    const ok=item?recoverMemoryFromDeadCharacter(c.id,item.instanceId):completeMemorySalvage(c);
+    if(ok)dialog.close();else{committed=false;e.currentTarget.disabled=false;dialog.body.querySelector("#recoveryError").textContent="保存できませんでした。容量・回収候補を確認して再試行してください。";}
+  };
+  dialog.overlay.querySelector(".equipment-dialog-close").focus();
+}
+function renderMemorySalvage(c){
+  const flow=state.run.salvage,candidates=salvageCandidates(c);
+  if(!candidates.some(m=>m.instanceId===flow.selectedInstanceId))flow.selectedInstanceId=null;
+  el.innerHTML=`<section class="salvage-screen" aria-label="Memory Salvage"><header><p class="kicker">MEMORY SALVAGE</p><h2>回収する記憶を選択</h2><p>${esc(c.name)} / DEPTH ${state.run.depth}</p><small>保存可能なMemoryは${DEATH_MEMORY_RECOVERY_COUNT}つです。破損率・BROKEN・Moduleは維持されます。</small></header><div class="salvage-list">${candidates.map(m=>`<article class="salvage-entry"><button class="inventory-item" data-salvage="${esc(m.instanceId)}" aria-pressed="${m.instanceId===flow.selectedInstanceId}">${memorySalvageSummary(m)}</button><button class="salvage-detail-button" data-salvage-detail="${esc(m.instanceId)}">詳細</button></article>`).join("")||"回収可能なMemoryはありません。"}</div><div class="salvage-actions"><button class="btn" id="confirmSalvage" ${flow.selectedInstanceId?"":"disabled"}>RECOVER / 選択したMemoryを回収</button><button class="btn ghost" id="confirmDeath">回収せず終了</button></div></section>`;
+  el.querySelectorAll("[data-salvage]").forEach(b=>b.onclick=()=>{flow.selectedInstanceId=b.dataset.salvage;save();el.querySelectorAll("[data-salvage]").forEach(n=>n.setAttribute("aria-pressed",String(n===b)));el.querySelector("#confirmSalvage").disabled=false;});
+  el.querySelectorAll("[data-salvage-detail]").forEach(b=>b.onclick=()=>openMemoryArchiveDetails(c,candidates.find(m=>m.instanceId===b.dataset.salvageDetail)));
+  el.querySelector("#confirmSalvage").onclick=()=>{if(flow.selectedInstanceId)confirmMemoryRecovery(c,flow.selectedInstanceId);};
+  el.querySelector("#confirmDeath").onclick=()=>confirmMemoryRecovery(c,null);
 }
 
 function moduleEffects(m){
@@ -1424,13 +1498,19 @@ function storageEquipmentList(c,type=null){
   return items.map(item=>`<button class="inventory-item equipment-choice" data-equipment="${esc(item.instanceId)}"><small>${getMemDef(item)?"STORAGE MEMORY":"STORAGE WEAPON"}</small>${equipmentSummary(item)}${getMemDef(item)?"":`<small>${esc(item.weaponType)}<br>${weaponStorageSpec(item)}</small>`}</button>`).join("");
 }
 let inventoryCharacterId=null,inventoryTab="equipped";
+function openMemoryArchive(){
+  const dialog=equipmentDialog("memory-archive","MEMORY ARCHIVE / 記憶保管領域");
+  dialog.body.innerHTML=`<p>回収記憶はCREATE確定時に次のCharacterへ移動します。戦闘で使用しても消滅しません。</p>${state.metaInventory.memories.map(m=>`<article class="archive-memory" data-archive-memory="${esc(m.instanceId)}">${memorySalvageSummary(m)}<details><summary>詳細 / MODULE SLOT</summary>${memoryArchiveDetails(null,m)}</details></article>`).join("")||"回収記憶はありません。"}`;
+  dialog.overlay.querySelector(".equipment-dialog-close").focus();
+}
 function renderInventory(){
   const owned=state.slots.filter(Boolean),c=owned.find(c=>c.id===inventoryCharacterId)||owned[0];inventoryCharacterId=c?.id;
-  el.innerHTML=`<section class="inventory-heading"><h2>INVENTORY</h2>${c?`<select id="inventoryCharacter" aria-label="キャラクター">${owned.map(x=>`<option value="${esc(x.id)}" ${x===c?"selected":""}>${esc(x.name)}</option>`).join("")}</select><p class="small">${statsDescription(c)}</p><div class="inventory-tabs">${[["equipped","EQUIPPED"],["weapons","WEAPONS"],["memories","MEMORIES"],["modules","MODULES"]].map(([id,label])=>`<button data-inventory-tab="${id}" aria-pressed="${inventoryTab===id}">${label}</button>`).join("")}</div>`:""}</section><section class="inventory-list inventory-panel">${!c?"保有データなし。":inventoryTab==="equipped"?equipmentList(c):inventoryTab==="weapons"||inventoryTab==="memories"?`<h3>STORAGE / ${inventoryTab.toUpperCase()}</h3>${storageEquipmentList(c,inventoryTab)||(inventoryTab==="weapons"?"所持武器なし。":"所持メモリなし。")}`:`<h3>STORAGE / MODULES</h3>${c.inventory.modules.map(m=>`<button class="inventory-item module-choice" data-install-module="${esc(m.instanceId)}" ${getModuleDef(m)&&canModifyEquipment(c)?"":"disabled"}>${moduleSummary(m)}<small>インストール先を選択 ›</small></button>`).join("")||"未使用モジュールなし。"}`}</section><button class="btn ghost" data-nav="home">← HOME</button>`;
+  el.innerHTML=`<section class="inventory-heading"><h2>INVENTORY</h2><button class="archive-entry-button" id="openMemoryArchive">MEMORY ARCHIVE / 回収記憶 ${state.metaInventory.memories.length}</button>${c?`<select id="inventoryCharacter" aria-label="キャラクター">${owned.map(x=>`<option value="${esc(x.id)}" ${x===c?"selected":""}>${esc(x.name)}</option>`).join("")}</select><p class="small">${statsDescription(c)}</p><div class="inventory-tabs">${[["equipped","EQUIPPED"],["weapons","WEAPONS"],["memories","MEMORIES"],["modules","MODULES"]].map(([id,label])=>`<button data-inventory-tab="${id}" aria-pressed="${inventoryTab===id}">${label}</button>`).join("")}</div>`:""}</section><section class="inventory-list inventory-panel">${!c?"保有データなし。":inventoryTab==="equipped"?equipmentList(c):inventoryTab==="weapons"||inventoryTab==="memories"?`<h3>STORAGE / ${inventoryTab.toUpperCase()}</h3>${storageEquipmentList(c,inventoryTab)||(inventoryTab==="weapons"?"所持武器なし。":"所持メモリなし。")}`:`<h3>STORAGE / MODULES</h3>${c.inventory.modules.map(m=>`<button class="inventory-item module-choice" data-install-module="${esc(m.instanceId)}" ${getModuleDef(m)&&canModifyEquipment(c)?"":"disabled"}>${moduleSummary(m)}<small>インストール先を選択 ›</small></button>`).join("")||"未使用モジュールなし。"}`}</section><button class="btn ghost" data-nav="home">← HOME</button>`;
   bindNav();
   el.querySelectorAll("[data-inventory-tab]").forEach(b=>b.onclick=()=>{inventoryTab=b.dataset.inventoryTab;renderInventory();});
   el.querySelectorAll("[data-equipment]").forEach(b=>b.onclick=()=>openModuleInstall(c,null,{targetId:b.dataset.equipment}));
   const selector=el.querySelector("#inventoryCharacter");if(selector)selector.onchange=()=>{inventoryCharacterId=selector.value;renderInventory();};
+  el.querySelector("#openMemoryArchive").onclick=openMemoryArchive;
   el.querySelectorAll("[data-install-module]").forEach(b=>b.onclick=()=>openModuleInstall(c,b.dataset.installModule));
 }
 // Dialogs isolate the underlying run; combat timers keep their existing pacing.

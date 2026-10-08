@@ -1191,3 +1191,15 @@ When implementing future user instructions:
 - 武器・メモリは既存作成画面から詳細一覧を開く。武器はレア度・種別・威力・MAIN・命中・HIT数・Module容量を表示。メモリは4枠から装着先を選択し、職業初期装備または回収個体のカードを押して設定する。威力（Module補正含む）・HIT数・命中・CT・効果・説明・レア度を表示する。回収個体には破損率・BROKEN・取得深度・装着Moduleも表示する。
 - 回収個体の選択・取消・BACKでは消費しない。CREATEで同じ個体を移動し、破損率・Module・instanceIdを維持する。同名Definitionの複数装備禁止は維持し、選択時は既存枠と交換する。
 - 職業変更や旧Draftロード時は、回収個体を保持しながら未所持の通常Memoryを職業の初期装備へ補正する。既存Characterの武器・メモリは変更しない。全体画面はスクロールせず、詳細一覧だけ内部スクロールする。フォントは通常フォントを維持する。
+
+### CONFIRMED — 記憶回収の画面・確定・リロード保護 / 2026-10-08
+
+- `CONNECTION LOST`から`MEMORY SALVAGE`を開く。死亡Characterは確定まで残す。`DEATH_MEMORY_RECOVERY_COUNT=1`。候補は装備中とCharacter StorageのMemoryをinstanceIdで重複排除した一覧。武器・未使用Module単体は候補に含めない。
+- 回収候補はアイコン、名前、レア度、category / execution、破損率、BROKEN、Module容量を表示。詳細にはModule補正後のBASE POWER、MAIN、HIT / HIT COUNT、CT、説明、Slot単位のModule効果とEMPTYを表示する。回収と放棄は確認ダイアログを経由する。
+- `run.salvage:{opened,selectedInstanceId}`を保存。回収画面と選択はReload後も復元する。回収の共通APIはdead phase・owner・Character所有・Archive重複・他Characterとの所有重複を検証する。保存失敗時はCharacterとMemory所有権、CTを戻す。確定後の再実行は無効。
+- `metaInventory:{memories:MemoryInstance[]}`はCharacterとは独立。欠落フィールドは既存normalizeItem / normalizeModuleで補完し、再抽選はしない。正常な保存済みMemory個体のmoduleSlotsは維持する。ArchiveのCTは0。BROKEN・破損率・Module・取得深度・追加個体情報は修理・リセットしない。
+- Draftは後方互換のため`memoryIds[4]`（Definitionのみ）と`recoveredMemoryIds[4]`（Instanceのみ、通常枠はnull）を別配列で保持する。同一配列へID種別を混在させない。MEMORY LOADOUTはSTANDARD / RECOVEREDを明示する。Standard候補は従来の職業初期4種。
+- 編集中の選択・選択Slotは`creationEditor:{kind:"memory",draft,selectedSlot}`へ保存する。Reloadで編集を復元し、CANCELは編集開始前のDraftへ戻す。所有権の消費は一切行わない。BACKでもArchiveは残る。
+- `commitCharacterCreation()`で検証、Character生成、同じRecovered Memory個体の移動、Archiveから除去、Slot / Run保存を一度に確定する。保存失敗時は所有権・Draft・CTを戻す。初期HPはgetEffectiveMaxHpで満たす。base maxHp=42は維持する。
+- Home → INVENTORY → MEMORY ARCHIVEはCharacterが0体でも利用可能。回収記憶の一覧・詳細を読み取り専用で確認する。取り外し・修理・コピー・無料アンロックは追加しない。
+- 継承後のMemoryは通常通り繰り返し使用できる。使用1回で消滅する仕様ではない。次の死亡時も自動回収されず、再度1個として選択した場合のみArchiveへ戻る。

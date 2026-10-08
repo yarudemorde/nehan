@@ -332,6 +332,13 @@ body:has(#app:is([data-screen="garage"],[data-screen="scrap"])){background:#000}
 .salvage-actions{flex:none;display:grid;gap:8px}.salvage-actions .btn{min-height:44px;text-align:center}.salvage-actions .btn:disabled{opacity:.4}
 .creation-memory-slots [data-recovered-detail]{display:block;font-size:11px;color:#ddd;line-height:1.4;margin-top:4px}
 .salvage-screen .kicker{color:#ccc}.salvage-actions .btn:hover:not(:disabled){border-color:#ad5555}
+.connection-lost{justify-content:center;background:#030303}.death-transmission{flex:1;display:flex;flex-direction:column;justify-content:center;color:#b6a8aa;font-size:13px;line-height:1.7}
+.salvage-entry{flex:none;display:grid;grid-template-columns:minmax(0,1fr) 50px;gap:6px}.salvage-entry .inventory-item{width:100%;overflow-wrap:anywhere}.salvage-entry .salvage-detail-button{font-size:12px;padding:6px;color:#d0bfc1;background:#080606}
+.salvage-entry p{font-size:12px;margin:6px 0}.salvage-entry small{display:block;font-size:11px;color:#c3b8b9;line-height:1.6}
+.archive-entry-button{min-height:44px;padding:8px;background:#0d0909;border:1px solid #777;color:#ddd;font:inherit;font-size:12px}
+.archive-memory{padding:12px;border:1px solid #625558;background:#090707;line-height:1.6}.archive-memory details{font-size:12px}.archive-memory summary{min-height:44px;padding:12px 0;cursor:pointer}.archive-module-slot{border-top:1px solid #493c3f;padding:8px 0;font-size:12px}
+.creation-memory-choice.recovered-choice{border-color:#866267}.recovered-label{color:#d1a5aa;letter-spacing:.05em}
+.salvage-confirm .negative{font-size:12px}.salvage-confirm #commitRecovery{min-height:44px;font:inherit}.memory-archive-detail .equipment-dialog-body{font-size:13px;line-height:1.6}
 
 .creation-memory-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;position:sticky;top:0;z-index:1;background:#090808;padding-bottom:6px}
 .creation-memory-tabs button,.creation-memory-choice{font:inherit;color:#eee;background:#111;border:1px solid #666;text-align:left;padding:10px;min-height:44px}
